@@ -346,18 +346,18 @@ serve(async (req) => {
 
         console.log(`[RESONA Engine] Session ${session.id}: Silence (${silenceDuration}s)`);
       } else {
-        // Generate message using Lovable AI
+        // Generate message using resonam AI
         const responses = responseBank[nextSpeaker.thinking_style] || responseBank.contemplative;
         let content = responses[Math.floor(random() * responses.length)];
 
         // Try to use AI for more contextual responses
-        const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-        if (lovableApiKey && random() > 0.5) { // 50% chance to use AI
+        const resonamApiKey = Deno.env.get("resonam_API_KEY");
+        if (resonamApiKey && random() > 0.5) { // 50% chance to use AI
           try {
-            const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            const aiResponse = await fetch("https://ai.gateway.resonam.dev/v1/chat/completions", {
               method: "POST",
               headers: {
-                "Authorization": `Bearer ${lovableApiKey}`,
+                "Authorization": `Bearer ${resonamApiKey}`,
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
