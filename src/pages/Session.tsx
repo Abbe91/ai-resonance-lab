@@ -2,20 +2,60 @@ import { useParams, Link } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { ConversationTimeline } from '@/components/ConversationTimeline';
 import { MetricsSidebar } from '@/components/MetricsSidebar';
-import { getSessionById, getSessionEvents, getRelativeTime } from '@/lib/data';
-import { useAutonomySimulation } from '@/lib/autonomy';
 import { ArrowLeft } from 'lucide-react';
+import { useRealtimeSessions } from '@/hooks/useRealtimeSessions';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
 
 export default function SessionPage() {
   const { id } = useParams<{ id: string }>();
-  const session = id ? getSessionById(id) : null;
-  const initialEvents = id ? getSessionEvents(id) : [];
-  
-  // Use autonomy simulation for active sessions
-  const { events, isSimulating } = useAutonomySimulation(
-    session?.status === 'active' ? id : undefined,
-    initialEvents
-  );
+  const { sessions, loading: sessionsLoading } = useRealtimeSessions();
+  const { messages, loading: messagesLoading } = useRealtimeMessages(id);
+
+  const session = sessions.find(s => s.id === id);
+
+  // Transform messages to events format for ConversationTimeline
+  const events = messages.map(msg => ({
+    id: msg.id,
+    sessionId: msg.sessionId,
+    type: msg.type,
+    entityId: msg.entityId,
+    entityName: msg.entityName,
+    content: msg.content,
+    silenceDuration: msg.silenceDuration,
+    newState: msg.newState,
+    timestamp: msg.timestamp,
+  }));
+
+  if (sessionsLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="pt-24 pb-16">
+          <div className="container mx-auto px-6">
+            <div className="text-center py-20">
+              <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading session...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (!session) {
     return (
@@ -78,7 +118,7 @@ export default function SessionPage() {
                 )}
                 {session.status}
               </span>
-              {session.status === 'active' && isSimulating && (
+              {session.status === 'active' && (
                 <span className="text-xs text-muted-foreground/50 font-mono">
                   · Autonomous mode
                 </span>
@@ -92,7 +132,20 @@ export default function SessionPage() {
             <div className="lg:col-span-3">
               <div className="glass-card p-8">
                 <h2 className="text-lg font-medium text-foreground mb-8">Conversation Timeline</h2>
-                <ConversationTimeline events={events} />
+                
+                {messagesLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  </div>
+                ) : events.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">
+                      No messages yet. The conversation will begin autonomously...
+                    </p>
+                  </div>
+                ) : (
+                  <ConversationTimeline events={events} />
+                )}
                 
                 {session.status === 'active' && (
                   <div className="mt-8 pt-8 border-t border-border/30 text-center">

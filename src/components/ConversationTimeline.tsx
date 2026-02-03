@@ -1,8 +1,40 @@
-import { MessageEvent } from '@/lib/types';
-import { getEntityById, formatDuration } from '@/lib/data';
+import { supabase } from '@/integrations/supabase/client';
+
+// Get agent by ID from database (for timeline entity lookup)
+async function fetchAgentById(id: string) {
+  const { data } = await supabase
+    .from('agents')
+    .select('id, name, designation')
+    .eq('id', id)
+    .single();
+  return data;
+}
+
+// Local cache for agents
+const agentCache: Record<string, { name: string; designation: string } | null> = {};
+
+interface TimelineEvent {
+  id: string;
+  sessionId: string;
+  type: 'message' | 'silence' | 'state_change';
+  entityId?: string;
+  entityName?: string;
+  content?: string;
+  silenceDuration?: number;
+  newState?: string;
+  timestamp: Date;
+}
 
 interface ConversationTimelineProps {
-  events: MessageEvent[];
+  events: TimelineEvent[];
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${mins}m`;
 }
 
 export function ConversationTimeline({ events }: ConversationTimelineProps) {
@@ -17,15 +49,13 @@ export function ConversationTimeline({ events }: ConversationTimelineProps) {
   return (
     <div className="space-y-0">
       {events.map((event, index) => (
-        <TimelineEvent key={event.id} event={event} index={index} />
+        <TimelineEventComponent key={event.id} event={event} index={index} />
       ))}
     </div>
   );
 }
 
-function TimelineEvent({ event, index }: { event: MessageEvent; index: number }) {
-  const entity = event.entityId ? getEntityById(event.entityId) : null;
-
+function TimelineEventComponent({ event, index }: { event: TimelineEvent; index: number }) {
   if (event.type === 'silence') {
     return <SilenceEvent duration={event.silenceDuration || 0} />;
   }
@@ -33,6 +63,9 @@ function TimelineEvent({ event, index }: { event: MessageEvent; index: number })
   if (event.type === 'state_change') {
     return <StateChangeEvent newState={event.newState || 'strangers'} />;
   }
+
+  // For message events, use entityName if available or show entityId
+  const displayName = event.entityName || (event.entityId ? `Entity ${event.entityId.slice(0, 8)}` : 'UNKNOWN');
 
   return (
     <div 
@@ -42,7 +75,7 @@ function TimelineEvent({ event, index }: { event: MessageEvent; index: number })
       <div className="flex items-start gap-4">
         <div className="flex-shrink-0 pt-1">
           <span className="font-mono text-xs text-primary">
-            {entity?.designation || 'UNKNOWN'}
+            {displayName}
           </span>
         </div>
         <div className="flex-1">

@@ -1,8 +1,20 @@
-import { Entity } from '@/lib/types';
 import { Link } from 'react-router-dom';
 
+interface EntityCardEntity {
+  id: string;
+  name: string;
+  designation: string;
+  description?: string | null;
+  traits: {
+    thinkingStyle: string;
+    curiosity: number;
+    empathy: number;
+    silenceTolerance: number;
+  };
+}
+
 interface EntityCardProps {
-  entity: Entity;
+  entity: EntityCardEntity;
   compact?: boolean;
 }
 
@@ -43,9 +55,11 @@ export function EntityCard({ entity, compact = false }: EntityCardProps) {
           {entity.name}
         </h3>
 
-        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
-          {entity.description}
-        </p>
+        {entity.description && (
+          <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+            {entity.description}
+          </p>
+        )}
 
         {/* Trait Bars */}
         <div className="mt-6 space-y-3">
