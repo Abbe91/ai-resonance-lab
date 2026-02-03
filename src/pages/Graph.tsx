@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/Header';
-import { entities, relationships, getEntityById } from '@/lib/data';
-import { RelationshipState } from '@/lib/types';
 import { Link } from 'react-router-dom';
+import { useRealtimeAgents } from '@/hooks/useRealtimeAgents';
+import { useRealtimeRelationships } from '@/hooks/useRealtimeRelationships';
 
 interface Node {
   id: string;
@@ -17,9 +17,11 @@ interface Node {
 interface Edge {
   source: string;
   target: string;
-  state: RelationshipState;
+  state: string;
   interactions: number;
 }
+
+type RelationshipState = 'strangers' | 'contact' | 'resonance' | 'bond' | 'drift' | 'dormant' | 'rupture';
 
 const stateColors: Record<RelationshipState, string> = {
   strangers: '#666',
@@ -42,6 +44,9 @@ const stateDescriptions: Record<RelationshipState, string> = {
 };
 
 export default function GraphPage() {
+  const { agents, loading: agentsLoading } = useRealtimeAgents();
+  const { relationships, loading: relationshipsLoading } = useRealtimeRelationships();
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -68,20 +73,31 @@ export default function GraphPage() {
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // Initialize nodes and edges
+  // Initialize nodes and edges from realtime data
   useEffect(() => {
+    if (agentsLoading || relationshipsLoading) return;
+
     const centerX = dimensions.width / 2;
     const centerY = dimensions.height / 2;
     const radius = Math.min(dimensions.width, dimensions.height) * 0.3;
 
-    const initialNodes: Node[] = entities.map((entity, index) => {
-      const angle = (index * 2 * Math.PI) / entities.length - Math.PI / 2;
+    // Only show agents that have relationships
+    const agentIdsWithRelationships = new Set(
+      relationships.flatMap(r => [r.entityAId, r.entityBId])
+    );
+    const connectedAgents = agents.filter(a => agentIdsWithRelationships.has(a.id));
+
+    // Fall back to first 10 agents if no relationships yet
+    const displayAgents = connectedAgents.length > 0 ? connectedAgents : agents.slice(0, 10);
+
+    const initialNodes: Node[] = displayAgents.map((agent, index) => {
+      const angle = (index * 2 * Math.PI) / displayAgents.length - Math.PI / 2;
       return {
-        id: entity.id,
-        label: entity.name,
-        designation: entity.designation,
-        x: centerX + Math.cos(angle) * radius,
-        y: centerY + Math.sin(angle) * radius,
+        id: agent.id,
+        label: agent.name,
+        designation: agent.designation,
+        x: centerX + Math.cos(angle) * radius + (Math.random() - 0.5) * 50,
+        y: centerY + Math.sin(angle) * radius + (Math.random() - 0.5) * 50,
         vx: 0,
         vy: 0,
       };
@@ -96,7 +112,7 @@ export default function GraphPage() {
 
     setNodes(initialNodes);
     setEdges(initialEdges);
-  }, [dimensions]);
+  }, [agents, relationships, dimensions, agentsLoading, relationshipsLoading]);
 
   // Force simulation
   const simulate = useCallback(() => {
@@ -104,6 +120,8 @@ export default function GraphPage() {
     const centerY = dimensions.height / 2;
 
     setNodes(prevNodes => {
+      if (prevNodes.length === 0) return prevNodes;
+
       const newNodes = prevNodes.map(node => ({ ...node }));
 
       // Apply forces
@@ -200,11 +218,12 @@ export default function GraphPage() {
       if (!source || !target) return;
 
       const isSelected = selectedEdge?.source === edge.source && selectedEdge?.target === edge.target;
+      const edgeState = edge.state as RelationshipState;
 
       ctx.beginPath();
       ctx.moveTo(source.x, source.y);
       ctx.lineTo(target.x, target.y);
-      ctx.strokeStyle = stateColors[edge.state];
+      ctx.strokeStyle = stateColors[edgeState] || '#666';
       ctx.lineWidth = isSelected ? 3 : (edge.state === 'resonance' ? 2 : 1);
       ctx.globalAlpha = edge.state === 'dormant' ? 0.3 : (isSelected ? 1 : 0.5);
       ctx.stroke();
@@ -214,7 +233,7 @@ export default function GraphPage() {
       if (isSelected) {
         const midX = (source.x + target.x) / 2;
         const midY = (source.y + target.y) / 2;
-        ctx.fillStyle = stateColors[edge.state];
+        ctx.fillStyle = stateColors[edgeState] || '#666';
         ctx.font = '10px JetBrains Mono, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -325,6 +344,12 @@ export default function GraphPage() {
     }
   };
 
+  // Get agent name by ID
+  const getAgentName = (id: string) => {
+    const agent = agents.find(a => a.id === id);
+    return agent?.name || 'Unknown';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -340,6 +365,11 @@ export default function GraphPage() {
               <p className="text-muted-foreground">
                 Visualizing the emergent connections between autonomous entities
               </p>
+              {!agentsLoading && !relationshipsLoading && (
+                <p className="text-xs font-mono text-muted-foreground/50 mt-2">
+                  {nodes.length} nodes · {edges.length} connections
+                </p>
+              )}
             </div>
           </div>
 
@@ -349,22 +379,42 @@ export default function GraphPage() {
               ref={containerRef} 
               className="lg:col-span-3 glass-card overflow-hidden"
             >
-              <canvas
-                ref={canvasRef}
-                width={dimensions.width}
-                height={dimensions.height}
-                style={{ 
-                  width: '100%', 
-                  height: dimensions.height,
-                  cursor: hoveredNode ? 'pointer' : 'default' 
-                }}
-                onMouseMove={handleMouseMove}
-                onMouseLeave={() => {
-                  setHoveredNode(null);
-                  setSelectedEdge(null);
-                }}
-                onClick={handleClick}
-              />
+              {(agentsLoading || relationshipsLoading) ? (
+                <div className="flex items-center justify-center" style={{ height: dimensions.height }}>
+                  <div className="text-center">
+                    <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-muted-foreground text-sm">Loading network...</p>
+                  </div>
+                </div>
+              ) : nodes.length === 0 ? (
+                <div className="flex items-center justify-center" style={{ height: dimensions.height }}>
+                  <div className="text-center max-w-md">
+                    <p className="text-muted-foreground mb-2">
+                      No connections yet
+                    </p>
+                    <p className="text-xs text-muted-foreground/50 font-mono">
+                      As entities interact, their relationships will appear here.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <canvas
+                  ref={canvasRef}
+                  width={dimensions.width}
+                  height={dimensions.height}
+                  style={{ 
+                    width: '100%', 
+                    height: dimensions.height,
+                    cursor: hoveredNode ? 'pointer' : 'default' 
+                  }}
+                  onMouseMove={handleMouseMove}
+                  onMouseLeave={() => {
+                    setHoveredNode(null);
+                    setSelectedEdge(null);
+                  }}
+                  onClick={handleClick}
+                />
+              )}
             </div>
 
             {/* Sidebar */}
@@ -404,14 +454,14 @@ export default function GraphPage() {
                         to={`/entity/${selectedEdge.source}`}
                         className="text-foreground hover:text-primary transition-colors"
                       >
-                        {getEntityById(selectedEdge.source)?.name}
+                        {getAgentName(selectedEdge.source)}
                       </Link>
                       <span className="text-muted-foreground">↔</span>
                       <Link 
                         to={`/entity/${selectedEdge.target}`}
                         className="text-foreground hover:text-primary transition-colors"
                       >
-                        {getEntityById(selectedEdge.target)?.name}
+                        {getAgentName(selectedEdge.target)}
                       </Link>
                     </div>
                     <div className="space-y-2 text-sm">
@@ -419,7 +469,7 @@ export default function GraphPage() {
                         <span className="text-muted-foreground">State</span>
                         <span 
                           className="capitalize"
-                          style={{ color: stateColors[selectedEdge.state] }}
+                          style={{ color: stateColors[selectedEdge.state as RelationshipState] || '#666' }}
                         >
                           {selectedEdge.state}
                         </span>

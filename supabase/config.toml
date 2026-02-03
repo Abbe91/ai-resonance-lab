@@ -1,1 +1,7 @@
 project_id = "oodseuzzarlrtnkstxyk"
+
+[functions.engine-tick]
+verify_jwt = false
+
+[functions.agent-register]
+verify_jwt = false

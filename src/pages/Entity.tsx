@@ -1,9 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { SessionCard } from '@/components/SessionCard';
-import { getEntityById, getEntityRelationships, sessions, getRelativeTime } from '@/lib/data';
 import { ArrowLeft } from 'lucide-react';
-import { RelationshipState } from '@/lib/types';
+import { useRealtimeAgent } from '@/hooks/useRealtimeAgents';
+import { useRealtimeSessions } from '@/hooks/useRealtimeSessions';
+import { useEntityRelationships } from '@/hooks/useRealtimeRelationships';
+import { useRealtimeAgents } from '@/hooks/useRealtimeAgents';
+
+type RelationshipState = 'strangers' | 'contact' | 'resonance' | 'bond' | 'drift' | 'dormant' | 'rupture';
 
 const stateColors: Record<RelationshipState, string> = {
   strangers: 'text-muted-foreground',
@@ -15,13 +19,54 @@ const stateColors: Record<RelationshipState, string> = {
   rupture: 'text-rupture',
 };
 
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
 export default function EntityPage() {
   const { id } = useParams<{ id: string }>();
-  const entity = id ? getEntityById(id) : null;
-  const relationships = id ? getEntityRelationships(id) : [];
+  const { agent: entity, loading: entityLoading } = useRealtimeAgent(id);
+  const { sessions, loading: sessionsLoading } = useRealtimeSessions();
+  const { relationships, loading: relationshipsLoading } = useEntityRelationships(id);
+  const { agents } = useRealtimeAgents();
+
+  // Filter sessions for this entity
   const entitySessions = sessions.filter(
     s => s.entityA.id === id || s.entityB.id === id
   );
+
+  // Helper to get agent name by ID
+  const getAgentName = (agentId: string) => {
+    const agent = agents.find(a => a.id === agentId);
+    return agent?.name || 'Unknown';
+  };
+
+  if (entityLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="pt-24 pb-16">
+          <div className="container mx-auto px-6">
+            <div className="text-center py-20">
+              <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading entity...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (!entity) {
     return (
@@ -71,9 +116,11 @@ export default function EntityPage() {
                 </div>
 
                 {/* Description */}
-                <blockquote className="text-muted-foreground leading-relaxed mb-8 border-l-2 border-primary/30 pl-4 italic">
-                  {entity.description}
-                </blockquote>
+                {entity.description && (
+                  <blockquote className="text-muted-foreground leading-relaxed mb-8 border-l-2 border-primary/30 pl-4 italic">
+                    {entity.description}
+                  </blockquote>
+                )}
 
                 {/* Traits */}
                 <div className="space-y-6">
@@ -83,13 +130,30 @@ export default function EntityPage() {
                   
                   <div className="space-y-4">
                     <TraitDisplay label="Thinking Style" value={entity.traits.thinkingStyle} isText />
+                    <TraitDisplay label="Conflict Style" value={entity.conflictStyle} isText />
                     <TraitDisplay label="Curiosity" value={entity.traits.curiosity} />
                     <TraitDisplay label="Empathy" value={entity.traits.empathy} />
                     <TraitDisplay label="Silence Tolerance" value={entity.traits.silenceTolerance} />
                     <TraitDisplay label="Verbosity" value={entity.traits.verbosity} />
-                    <TraitDisplay label="Novelty Seeking" value={entity.traits.noveltySeeker} />
+                    <TraitDisplay label="Novelty Seeking" value={entity.traits.noveltySeeking} />
                   </div>
                 </div>
+
+                {/* Goals */}
+                {entity.goals.length > 0 && (
+                  <div className="mt-8 pt-8 border-t border-border/30">
+                    <h3 className="text-xs uppercase tracking-widest text-muted-foreground mb-4">
+                      Goals
+                    </h3>
+                    <ul className="space-y-2">
+                      {entity.goals.map((goal, i) => (
+                        <li key={i} className="text-sm text-muted-foreground">
+                          • {goal}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 {/* Meta */}
                 <div className="mt-8 pt-8 border-t border-border/30 space-y-3 text-sm">
@@ -113,48 +177,63 @@ export default function EntityPage() {
                 <h3 className="text-xs uppercase tracking-widest text-muted-foreground mb-6">
                   Relationships
                 </h3>
-                <div className="space-y-4">
-                  {relationships.map(rel => {
-                    const otherId = rel.entityAId === entity.id ? rel.entityBId : rel.entityAId;
-                    const other = getEntityById(otherId);
-                    if (!other) return null;
+                {relationshipsLoading ? (
+                  <div className="flex justify-center py-4">
+                    <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  </div>
+                ) : relationships.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No relationships yet
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {relationships.map(rel => {
+                      const otherId = rel.entityAId === entity.id ? rel.entityBId : rel.entityAId;
+                      const otherName = rel.entityAId === entity.id ? rel.entityBName : rel.entityAName;
+                      const stateColor = stateColors[rel.state as RelationshipState] || 'text-muted-foreground';
 
-                    return (
-                      <Link 
-                        key={rel.id}
-                        to={`/entity/${other.id}`}
-                        className="block p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-foreground">{other.name}</span>
-                          <span className={`text-xs font-mono ${stateColors[rel.state]}`}>
-                            {rel.state}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {rel.totalInteractions} interactions
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
+                      return (
+                        <Link 
+                          key={rel.id}
+                          to={`/entity/${otherId}`}
+                          className="block p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-foreground">{otherName || getAgentName(otherId)}</span>
+                            <span className={`text-xs font-mono ${stateColor}`}>
+                              {rel.state}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {rel.totalInteractions} interactions
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Session History */}
             <div className="lg:col-span-2">
               <h2 className="text-lg font-medium text-foreground mb-6">Session History</h2>
-              <div className="space-y-4">
-                {entitySessions.length > 0 ? (
-                  entitySessions.map(session => (
+              {sessionsLoading ? (
+                <div className="glass-card p-12 text-center">
+                  <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-muted-foreground">Loading sessions...</p>
+                </div>
+              ) : entitySessions.length > 0 ? (
+                <div className="space-y-4">
+                  {entitySessions.map(session => (
                     <SessionCard key={session.id} session={session} />
-                  ))
-                ) : (
-                  <div className="glass-card p-12 text-center">
-                    <p className="text-muted-foreground">No sessions recorded</p>
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="glass-card p-12 text-center">
+                  <p className="text-muted-foreground">No sessions recorded yet</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
