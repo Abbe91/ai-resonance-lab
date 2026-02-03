@@ -2,6 +2,8 @@ import { useParams, Link } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { ConversationTimeline } from '@/components/ConversationTimeline';
 import { MetricsSidebar } from '@/components/MetricsSidebar';
+import { ObserverPanel } from '@/components/observer/ObserverPanel';
+import { ObserverDisclaimer } from '@/components/observer/ObserverDisclaimer';
 import { ArrowLeft } from 'lucide-react';
 import { useRealtimeSessions } from '@/hooks/useRealtimeSessions';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
@@ -127,9 +129,9 @@ export default function SessionPage() {
           </div>
 
           {/* Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Timeline */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-7">
               <div className="glass-card p-8">
                 <h2 className="text-lg font-medium text-foreground mb-8">Conversation Timeline</h2>
                 
@@ -159,11 +161,19 @@ export default function SessionPage() {
             </div>
 
             {/* Metrics Sidebar */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-2">
               <MetricsSidebar 
                 metrics={session.metrics} 
                 relationshipState={session.relationshipState}
               />
+            </div>
+
+            {/* Observer Panel */}
+            <div className="lg:col-span-3 space-y-4">
+              <ObserverPanel sessionId={session.id} />
+              <div className="flex justify-center">
+                <ObserverDisclaimer />
+              </div>
             </div>
           </div>
         </div>

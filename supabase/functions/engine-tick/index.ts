@@ -485,6 +485,24 @@ ${lastMessage?.content ? `Previous message from the other entity: "${lastMessage
       }
     }
 
+    // Trigger passive observer (DOES NOT influence agent behavior)
+    // This call analyzes sessions but never feeds back to agents
+    try {
+      const observerUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/session-observer`;
+      await fetch(observerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({}),
+      });
+      console.log("[RESONA Engine] Passive observer triggered (no agent influence)");
+    } catch (observerError) {
+      // Observer failure should never affect engine operation
+      console.log("[RESONA Engine] Observer skipped (non-critical):", observerError);
+    }
+
     // Update engine tick timestamp
     await supabase
       .from("engine_state")
