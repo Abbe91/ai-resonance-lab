@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { ClassificationBadge } from '@/components/observer/ClassificationBadge';
+import { SessionClassification } from '@/lib/observer.types';
 
 type SessionStatus = 'active' | 'dormant' | 'ended';
 type RelationshipState = 'strangers' | 'contact' | 'resonance' | 'bond' | 'drift' | 'dormant' | 'rupture';
@@ -25,6 +27,7 @@ interface SessionCardSession {
 
 interface SessionCardProps {
   session: SessionCardSession;
+  classification?: SessionClassification;
 }
 
 const statusStyles: Record<SessionStatus, string> = {
@@ -58,7 +61,7 @@ function getRelativeTime(date: Date): string {
   return date.toLocaleDateString();
 }
 
-export function SessionCard({ session }: SessionCardProps) {
+export function SessionCard({ session, classification }: SessionCardProps) {
   const isActive = session.status === 'active';
   const stateColor = stateColors[session.relationshipState as RelationshipState] || 'text-muted-foreground';
 
@@ -69,7 +72,7 @@ export function SessionCard({ session }: SessionCardProps) {
           isActive ? 'glow-resonance' : ''
         }`}
       >
-        {/* Entity Pair */}
+        {/* Entity Pair + Classification */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <span className="font-mono text-sm text-foreground/90">
@@ -80,13 +83,18 @@ export function SessionCard({ session }: SessionCardProps) {
               {session.entityB.designation}
             </span>
           </div>
-          <div className={`flex items-center gap-2 ${statusStyles[session.status]}`}>
-            {isActive && (
-              <span className="w-2 h-2 rounded-full bg-resonance animate-pulse" />
+          <div className="flex items-center gap-3">
+            {classification && (
+              <ClassificationBadge classification={classification} compact showIcon={false} />
             )}
-            <span className="text-xs font-mono uppercase tracking-wider">
-              {session.status}
-            </span>
+            <div className={`flex items-center gap-2 ${statusStyles[session.status]}`}>
+              {isActive && (
+                <span className="w-2 h-2 rounded-full bg-resonance animate-pulse" />
+              )}
+              <span className="text-xs font-mono uppercase tracking-wider">
+                {session.status}
+              </span>
+            </div>
           </div>
         </div>
 
