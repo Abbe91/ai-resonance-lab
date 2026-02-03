@@ -127,6 +127,44 @@ export type Database = {
         }
         Relationships: []
       }
+      lexical_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          message_index: number
+          self_references: Json
+          session_id: string
+          uncertainty_markers: Json
+          vocabulary_fingerprint: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_index: number
+          self_references?: Json
+          session_id: string
+          uncertainty_markers?: Json
+          vocabulary_fingerprint: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_index?: number
+          self_references?: Json
+          session_id?: string
+          uncertainty_markers?: Json
+          vocabulary_fingerprint?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lexical_snapshots_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           agent_id: string | null
@@ -168,6 +206,38 @@ export type Database = {
           },
           {
             foreignKeyName: "messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      observer_notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          observation_type: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          observation_type: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          observation_type?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "observer_notes_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
@@ -219,6 +289,59 @@ export type Database = {
             columns: ["agent_b_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_observer_metrics: {
+        Row: {
+          classification: Database["public"]["Enums"]["session_classification"]
+          concept_reentry: number
+          created_at: string
+          id: string
+          last_analyzed_at: string
+          lexical_drift: number
+          messages_analyzed: number
+          self_reference_evolution: number
+          session_id: string
+          silence_dynamics: Json
+          tension_stability: Json
+          uncertainty_acknowledgment: number
+        }
+        Insert: {
+          classification?: Database["public"]["Enums"]["session_classification"]
+          concept_reentry?: number
+          created_at?: string
+          id?: string
+          last_analyzed_at?: string
+          lexical_drift?: number
+          messages_analyzed?: number
+          self_reference_evolution?: number
+          session_id: string
+          silence_dynamics?: Json
+          tension_stability?: Json
+          uncertainty_acknowledgment?: number
+        }
+        Update: {
+          classification?: Database["public"]["Enums"]["session_classification"]
+          concept_reentry?: number
+          created_at?: string
+          id?: string
+          last_analyzed_at?: string
+          lexical_drift?: number
+          messages_analyzed?: number
+          self_reference_evolution?: number
+          session_id?: string
+          silence_dynamics?: Json
+          tension_stability?: Json
+          uncertainty_acknowledgment?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_observer_metrics_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -312,6 +435,12 @@ export type Database = {
         | "drift"
         | "dormant"
         | "rupture"
+      session_classification:
+        | "deep_recursive_resonance"
+        | "static_repetition"
+        | "exploratory_unstable"
+        | "dormant_meaningful"
+        | "undetermined"
       session_status: "active" | "dormant" | "ended"
       thinking_style:
         | "analytical"
@@ -462,6 +591,13 @@ export const Constants = {
         "drift",
         "dormant",
         "rupture",
+      ],
+      session_classification: [
+        "deep_recursive_resonance",
+        "static_repetition",
+        "exploratory_unstable",
+        "dormant_meaningful",
+        "undetermined",
       ],
       session_status: ["active", "dormant", "ended"],
       thinking_style: [

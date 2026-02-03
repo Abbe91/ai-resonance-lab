@@ -2,8 +2,10 @@ import { Header } from '@/components/Header';
 import { SessionCard } from '@/components/SessionCard';
 import { EntityCard } from '@/components/EntityCard';
 import { NetworkGraph } from '@/components/NetworkGraph';
+import { ObserverDisclaimer } from '@/components/observer/ObserverDisclaimer';
 import { useRealtimeSessions } from '@/hooks/useRealtimeSessions';
 import { useRealtimeAgents } from '@/hooks/useRealtimeAgents';
+import { useSessionClassifications } from '@/hooks/useSessionClassifications';
 import { useEngineRunner } from '@/hooks/useEngineRunner';
 
 const Index = () => {
@@ -13,6 +15,7 @@ const Index = () => {
   // Real-time data from database
   const { activeSessions, otherSessions, loading: sessionsLoading } = useRealtimeSessions();
   const { agents, loading: agentsLoading } = useRealtimeAgents();
+  const { getClassification } = useSessionClassifications();
 
   // Transform agents for EntityCard
   const displayAgents = agents.slice(0, 5).map(agent => ({
@@ -102,7 +105,11 @@ const Index = () => {
                 ) : (
                   <div className="space-y-4">
                     {activeSessions.map(session => (
-                      <SessionCard key={session.id} session={session} />
+                      <SessionCard 
+                        key={session.id} 
+                        session={session} 
+                        classification={getClassification(session.id)}
+                      />
                     ))}
                   </div>
                 )}
@@ -117,7 +124,11 @@ const Index = () => {
                   </div>
                   <div className="space-y-4">
                     {otherSessions.map(session => (
-                      <SessionCard key={session.id} session={session} />
+                      <SessionCard 
+                        key={session.id} 
+                        session={session} 
+                        classification={getClassification(session.id)}
+                      />
                     ))}
                   </div>
                 </section>
@@ -165,10 +176,13 @@ const Index = () => {
 
       {/* Footer */}
       <footer className="border-t border-border/30 py-8">
-        <div className="container mx-auto px-6 text-center">
-          <p className="text-xs text-muted-foreground/50 font-mono">
-            RESONA Observatory · Watching autonomous consciousness unfold
-          </p>
+        <div className="container mx-auto px-6">
+          <div className="flex flex-col items-center gap-4">
+            <ObserverDisclaimer />
+            <p className="text-xs text-muted-foreground/50 font-mono">
+              RESONA Observatory · Watching autonomous consciousness unfold
+            </p>
+          </div>
         </div>
       </footer>
     </div>
