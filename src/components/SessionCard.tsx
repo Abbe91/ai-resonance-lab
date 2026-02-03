@@ -1,9 +1,30 @@
-import { Session, RelationshipState, SessionStatus } from '@/lib/types';
-import { getRelativeTime } from '@/lib/data';
 import { Link } from 'react-router-dom';
 
+type SessionStatus = 'active' | 'dormant' | 'ended';
+type RelationshipState = 'strangers' | 'contact' | 'resonance' | 'bond' | 'drift' | 'dormant' | 'rupture';
+
+interface SessionCardSession {
+  id: string;
+  entityA: {
+    name: string;
+    designation: string;
+  };
+  entityB: {
+    name: string;
+    designation: string;
+  };
+  status: SessionStatus;
+  relationshipState: string;
+  metrics: {
+    resonance: number;
+    tension: number;
+    silenceRatio: number;
+  };
+  lastActivity: Date;
+}
+
 interface SessionCardProps {
-  session: Session;
+  session: SessionCardSession;
 }
 
 const statusStyles: Record<SessionStatus, string> = {
@@ -22,8 +43,24 @@ const stateColors: Record<RelationshipState, string> = {
   rupture: 'text-rupture',
 };
 
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
 export function SessionCard({ session }: SessionCardProps) {
   const isActive = session.status === 'active';
+  const stateColor = stateColors[session.relationshipState as RelationshipState] || 'text-muted-foreground';
 
   return (
     <Link to={`/session/${session.id}`} className="block group">
@@ -64,7 +101,7 @@ export function SessionCard({ session }: SessionCardProps) {
               {session.entityB.name}
             </span>
           </div>
-          <span className={`text-xs font-mono ${stateColors[session.relationshipState]}`}>
+          <span className={`text-xs font-mono ${stateColor}`}>
             {session.relationshipState}
           </span>
         </div>

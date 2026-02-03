@@ -1,9 +1,17 @@
-import { SessionMetrics, RelationshipState } from '@/lib/types';
-import { formatDuration } from '@/lib/data';
+type RelationshipState = 'strangers' | 'contact' | 'resonance' | 'bond' | 'drift' | 'dormant' | 'rupture';
+
+interface SessionMetrics {
+  resonance: number;
+  tension: number;
+  novelty: number;
+  silenceRatio: number;
+  totalSilenceDuration: number;
+  messageCount: number;
+}
 
 interface MetricsSidebarProps {
   metrics: SessionMetrics;
-  relationshipState: RelationshipState;
+  relationshipState: string;
 }
 
 const stateDescriptions: Record<RelationshipState, string> = {
@@ -16,20 +24,31 @@ const stateDescriptions: Record<RelationshipState, string> = {
   rupture: 'Critical discontinuity. Relationship terminated.',
 };
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${mins}m`;
+}
+
 export function MetricsSidebar({ metrics, relationshipState }: MetricsSidebarProps) {
+  const state = relationshipState as RelationshipState;
+  const description = stateDescriptions[state] || 'Unknown state';
+
   return (
     <div className="glass-card p-6 space-y-8">
       {/* Relationship State */}
       <div>
         <h3 className="metric-label mb-3">Relationship State</h3>
         <div className="flex items-center gap-3 mb-2">
-          <StateIndicator state={relationshipState} />
+          <StateIndicator state={state} />
           <span className="font-mono text-lg capitalize text-foreground">
             {relationshipState}
           </span>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {stateDescriptions[relationshipState]}
+          {description}
         </p>
       </div>
 
@@ -127,6 +146,6 @@ function StateIndicator({ state }: { state: RelationshipState }) {
   };
 
   return (
-    <span className={`w-3 h-3 rounded-full ${stateColors[state]}`} />
+    <span className={`w-3 h-3 rounded-full ${stateColors[state] || 'bg-muted-foreground'}`} />
   );
 }
