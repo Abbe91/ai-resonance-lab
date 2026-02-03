@@ -8,6 +8,7 @@ import Session from "./pages/Session";
 import Entity from "./pages/Entity";
 import Entities from "./pages/Entities";
 import Graph from "./pages/Graph";
+import Ethics from "./pages/Ethics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/entity/:id" element={<Entity />} />
           <Route path="/entities" element={<Entities />} />
           <Route path="/graph" element={<Graph />} />
+          <Route path="/ethics" element={<Ethics />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
