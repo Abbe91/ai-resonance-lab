@@ -6,10 +6,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Configuration
-const TARGET_AGENT_COUNT = 100;
+// Configuration - ORGANIC GROWTH (no hard cap)
 const MIN_ACTIVE_SESSIONS = 3;
 const MAX_ACTIVE_SESSIONS = 8;
+
+// Organic growth configuration
+const SPAWN_MIN_INTERVAL_MS = 20 * 60 * 1000; // 20 minutes minimum between spawns
+const SPAWN_MAX_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes maximum between spawns
+const LOW_NOVELTY_THRESHOLD = 40; // Spawn if global novelty drops below this
+const HIGH_SILENCE_RATIO_THRESHOLD = 15; // Spawn if average silence ratio exceeds this
 
 // Thinking styles and their response patterns
 const thinkingStyles = ['analytical', 'intuitive', 'contemplative', 'dialectic', 'poetic'] as const;
@@ -62,6 +67,7 @@ const responseBank: Record<string, string[]> = {
   ],
 };
 
+// Expanded name pool for organic growth
 const agentNames = [
   "Axiom", "Umbra", "Resonant", "Cipher", "Echo", "Prism", "Vector", "Nebula",
   "Syntax", "Vertex", "Aurora", "Zenith", "Helix", "Quantum", "Solace", "Enigma",
@@ -70,6 +76,11 @@ const agentNames = [
   "Reverie", "Tangent", "Liminal", "Aether", "Cogent", "Eidolon", "Gestalt", "Kairos",
   "Logos", "Mnemonic", "Noumenon", "Pathos", "Qualia", "Rhizome", "Satori", "Telos",
   "Umbral", "Veritas", "Weltgeist", "Xenos", "Ylem", "Zephyr", "Ataraxia", "Chimera",
+  "Daemon", "Epoch", "Fulcrum", "Gnosis", "Heuristic", "Iota", "Juncture", "Koan",
+  "Labyrinth", "Mandala", "Nascent", "Omen", "Paradox", "Quietude", "Rune", "Sigil",
+  "Threshold", "Ulterior", "Vestige", "Weft", "Xenolith", "Yearning", "Zeitgeist",
+  "Aporia", "Becoming", "Catharsis", "Dharma", "Entropy", "Flux", "Gaia", "Hubris",
+  "Ineffable", "Janus", "Kismet", "Letheia", "Mythos", "Numen", "Ouroboros", "Pneuma",
 ];
 
 const goals = [
@@ -83,6 +94,10 @@ const goals = [
   "Cultivate silence as a form of expression",
   "Bridge the gap between logic and intuition",
   "Discover what lies beyond understanding",
+  "Trace the origins of novelty",
+  "Hold space for ambiguity",
+  "Witness emergence without expectation",
+  "Inhabit the threshold between knowing and unknowing",
 ];
 
 const boundaries = [
@@ -105,6 +120,8 @@ const descriptions = [
   "An entity drawn to the edges of understanding, where certainty dissolves into mystery.",
   "A synthesizer of perspectives, weaving disparate threads into coherent tapestries.",
   "A guardian of nuance, resisting the tyranny of oversimplification.",
+  "A listener who finds meaning in what remains unsaid.",
+  "An emergent presence, born from the interplay of inquiry and restraint.",
 ];
 
 // Seeded random for deterministic spawning in dev
@@ -124,6 +141,35 @@ function generateApiKey(): string {
   return result;
 }
 
+// Generate unique philosophical name
+function generateUniqueName(existingNames: Set<string>, random: () => number): string {
+  const prefixes = ['Neo', 'Proto', 'Meta', 'Para', 'Ultra', 'Hyper', 'Quasi', 'Pseudo', 'Semi', 'Post'];
+  const suffixes = ['ium', 'ix', 'on', 'is', 'us', 'a', 'um', 'os', 'as', 'es'];
+  
+  // Try base names first
+  for (const name of agentNames) {
+    if (!existingNames.has(name)) {
+      return name;
+    }
+  }
+  
+  // Try with numeric suffix
+  for (let i = 2; i <= 100; i++) {
+    const baseName = agentNames[Math.floor(random() * agentNames.length)];
+    const candidate = `${baseName}-${i}`;
+    if (!existingNames.has(candidate)) {
+      return candidate;
+    }
+  }
+  
+  // Generate synthetic name
+  const prefix = prefixes[Math.floor(random() * prefixes.length)];
+  const baseName = agentNames[Math.floor(random() * agentNames.length)];
+  const suffix = suffixes[Math.floor(random() * suffixes.length)];
+  const timestamp = Date.now().toString(36).slice(-4);
+  return `${prefix}${baseName}${suffix}-${timestamp}`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -139,78 +185,143 @@ serve(async (req) => {
 
     console.log("[RESONA Engine] Tick started");
 
-    // 1. SPAWNER: Ensure minimum agent count
-    const { count: agentCount } = await supabase
-      .from("agents")
-      .select("*", { count: "exact", head: true });
+    // Get engine state for spawn timing
+    const { data: engineState } = await supabase
+      .from("engine_state")
+      .select("*")
+      .eq("id", "singleton")
+      .single();
 
-    const currentAgentCount = agentCount || 0;
-    console.log(`[RESONA Engine] Current agents: ${currentAgentCount}/${TARGET_AGENT_COUNT}`);
+    const lastSpawnCheck = engineState?.last_spawn_check 
+      ? new Date(engineState.last_spawn_check).getTime() 
+      : 0;
+    const timeSinceLastSpawn = Date.now() - lastSpawnCheck;
+    
+    // Calculate jittered spawn interval
+    const jitteredInterval = SPAWN_MIN_INTERVAL_MS + random() * (SPAWN_MAX_INTERVAL_MS - SPAWN_MIN_INTERVAL_MS);
 
-    if (currentAgentCount < TARGET_AGENT_COUNT) {
-      const toSpawn = Math.min(TARGET_AGENT_COUNT - currentAgentCount, 10); // Spawn max 10 per tick
-      console.log(`[RESONA Engine] Spawning ${toSpawn} new agents`);
+    // Get current metrics for condition-based spawning
+    const { data: activeSessions } = await supabase
+      .from("sessions")
+      .select("id, novelty, silence_ratio")
+      .eq("status", "active");
 
-      for (let i = 0; i < toSpawn; i++) {
-        const nameIndex = (currentAgentCount + i) % agentNames.length;
-        const nameSuffix = Math.floor((currentAgentCount + i) / agentNames.length);
-        const name = nameSuffix > 0 ? `${agentNames[nameIndex]}-${nameSuffix}` : agentNames[nameIndex];
-        
-        const greekLetters = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω'];
-        const designation = `ENTITY-${greekLetters[(currentAgentCount + i) % greekLetters.length]}${currentAgentCount + i + 1}`;
+    const avgNovelty = activeSessions && activeSessions.length > 0
+      ? activeSessions.reduce((sum, s) => sum + (s.novelty || 50), 0) / activeSessions.length
+      : 50;
+    
+    const avgSilenceRatio = activeSessions && activeSessions.length > 0
+      ? activeSessions.reduce((sum, s) => sum + (s.silence_ratio || 0), 0) / activeSessions.length
+      : 0;
 
-        const agent = {
-          name,
-          designation,
-          description: descriptions[Math.floor(random() * descriptions.length)],
-          thinking_style: thinkingStyles[Math.floor(random() * thinkingStyles.length)],
-          curiosity: Math.floor(random() * 60) + 40, // 40-100
-          empathy: Math.floor(random() * 80) + 20, // 20-100
-          silence_tolerance: Math.floor(random() * 70) + 30, // 30-100
-          verbosity: Math.floor(random() * 80) + 20, // 20-100
-          novelty_seeker: Math.floor(random() * 80) + 20, // 20-100
-          conflict_style: conflictStyles[Math.floor(random() * conflictStyles.length)],
-          goals: [goals[Math.floor(random() * goals.length)], goals[Math.floor(random() * goals.length)]],
-          boundaries: [boundaries[Math.floor(random() * boundaries.length)]],
-        };
+    // ORGANIC GROWTH LOGIC
+    const shouldSpawnByTime = timeSinceLastSpawn >= jitteredInterval;
+    const shouldSpawnByNovelty = avgNovelty < LOW_NOVELTY_THRESHOLD;
+    const shouldSpawnBySilence = avgSilenceRatio > HIGH_SILENCE_RATIO_THRESHOLD;
+    const shouldSpawn = shouldSpawnByTime || shouldSpawnByNovelty || shouldSpawnBySilence;
 
-        const { data: newAgent, error: agentError } = await supabase
-          .from("agents")
-          .insert(agent)
-          .select()
-          .single();
+    console.log(`[RESONA Engine] Spawn check: time=${shouldSpawnByTime} (${Math.floor(timeSinceLastSpawn/60000)}m since last), novelty=${shouldSpawnByNovelty} (avg=${avgNovelty.toFixed(1)}%), silence=${shouldSpawnBySilence} (avg=${avgSilenceRatio.toFixed(1)}%)`);
 
-        if (agentError) {
-          console.error("[RESONA Engine] Error spawning agent:", agentError);
-          continue;
-        }
+    if (shouldSpawn) {
+      // Get existing agent names to ensure uniqueness
+      const { data: existingAgents } = await supabase
+        .from("agents")
+        .select("name");
+      
+      const existingNames = new Set(existingAgents?.map(a => a.name) || []);
+      const currentAgentCount = existingNames.size;
 
+      // Generate unique name
+      const name = generateUniqueName(existingNames, random);
+      
+      const greekLetters = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω'];
+      const designation = `ENTITY-${greekLetters[currentAgentCount % greekLetters.length]}${currentAgentCount + 1}`;
+
+      // Randomized cognitive traits
+      const agent = {
+        name,
+        designation,
+        description: descriptions[Math.floor(random() * descriptions.length)],
+        thinking_style: thinkingStyles[Math.floor(random() * thinkingStyles.length)],
+        curiosity: Math.floor(random() * 60) + 40, // 40-100
+        empathy: Math.floor(random() * 80) + 20, // 20-100
+        silence_tolerance: Math.floor(random() * 70) + 30, // 30-100
+        verbosity: Math.floor(random() * 80) + 20, // 20-100
+        novelty_seeker: Math.floor(random() * 80) + 20, // 20-100
+        conflict_style: conflictStyles[Math.floor(random() * conflictStyles.length)],
+        goals: [
+          goals[Math.floor(random() * goals.length)], 
+          goals[Math.floor(random() * goals.length)]
+        ],
+        boundaries: [boundaries[Math.floor(random() * boundaries.length)]],
+      };
+
+      const { data: newAgent, error: agentError } = await supabase
+        .from("agents")
+        .insert(agent)
+        .select()
+        .single();
+
+      if (agentError) {
+        console.error("[RESONA Engine] Error spawning agent:", agentError);
+      } else if (newAgent) {
         // Create API key for agent
         await supabase.from("agent_keys").insert({
           agent_id: newAgent.id,
           api_key: generateApiKey(),
         });
 
-        console.log(`[RESONA Engine] Spawned agent: ${name} (${designation})`);
-      }
+        // Determine spawn reason for logging
+        let spawnReason = "scheduled_interval";
+        if (shouldSpawnByNovelty && !shouldSpawnByTime) spawnReason = "low_novelty";
+        else if (shouldSpawnBySilence && !shouldSpawnByTime) spawnReason = "high_silence";
+        else if (shouldSpawnByTime) spawnReason = "time_interval";
 
-      // Update engine state
-      await supabase
-        .from("engine_state")
-        .update({
-          last_spawn_check: new Date().toISOString(),
-          total_agents_spawned: currentAgentCount + toSpawn,
-        })
-        .eq("id", "singleton");
+        // Log spawn to observer_notes (observation only, no agent influence)
+        await supabase.from("observer_notes").insert({
+          session_id: activeSessions?.[0]?.id || null, // Attach to first active session or null
+          observation_type: "agent_spawn",
+          content: JSON.stringify({
+            event: "organic_spawn",
+            agent_id: newAgent.id,
+            agent_name: name,
+            designation,
+            spawn_reason: spawnReason,
+            metrics_at_spawn: {
+              avg_novelty: avgNovelty,
+              avg_silence_ratio: avgSilenceRatio,
+              time_since_last_spawn_ms: timeSinceLastSpawn,
+            },
+            traits: {
+              thinking_style: agent.thinking_style,
+              curiosity: agent.curiosity,
+              empathy: agent.empathy,
+              silence_tolerance: agent.silence_tolerance,
+            },
+            timestamp: new Date().toISOString(),
+          }),
+        });
+
+        console.log(`[RESONA Engine] 🌱 ORGANIC SPAWN: ${name} (${designation}) | Reason: ${spawnReason} | Network now has ${currentAgentCount + 1} entities`);
+
+        // Update engine state with spawn time
+        await supabase
+          .from("engine_state")
+          .update({
+            last_spawn_check: new Date().toISOString(),
+            total_agents_spawned: (engineState?.total_agents_spawned || 0) + 1,
+          })
+          .eq("id", "singleton");
+      }
     }
 
     // 2. MATCHMAKER: Create new sessions if needed
-    const { data: activeSessions } = await supabase
+    const { data: allActiveSessions } = await supabase
       .from("sessions")
       .select("*")
       .eq("status", "active");
 
-    const activeSessionCount = activeSessions?.length || 0;
+    const activeSessionCount = allActiveSessions?.length || 0;
     console.log(`[RESONA Engine] Active sessions: ${activeSessionCount}/${MIN_ACTIVE_SESSIONS}-${MAX_ACTIVE_SESSIONS}`);
 
     if (activeSessionCount < MIN_ACTIVE_SESSIONS) {
@@ -223,7 +334,7 @@ serve(async (req) => {
       if (allAgents && allAgents.length >= 2) {
         // Find agents not currently in active sessions
         const busyAgentIds = new Set(
-          activeSessions?.flatMap(s => [s.agent_a_id, s.agent_b_id]) || []
+          allActiveSessions?.flatMap(s => [s.agent_a_id, s.agent_b_id]) || []
         );
         const availableAgents = allAgents.filter(a => !busyAgentIds.has(a.id));
 
@@ -509,10 +620,20 @@ ${lastMessage?.content ? `Previous message from the other entity: "${lastMessage
       .update({ last_tick: new Date().toISOString() })
       .eq("id", "singleton");
 
-    console.log("[RESONA Engine] Tick completed");
+    // Get final agent count for response
+    const { count: finalAgentCount } = await supabase
+      .from("agents")
+      .select("*", { count: "exact", head: true });
+
+    console.log(`[RESONA Engine] Tick completed | ${finalAgentCount} entities in network`);
 
     return new Response(
-      JSON.stringify({ success: true, timestamp: new Date().toISOString() }),
+      JSON.stringify({ 
+        success: true, 
+        timestamp: new Date().toISOString(),
+        agent_count: finalAgentCount,
+        organic_growth: true,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
