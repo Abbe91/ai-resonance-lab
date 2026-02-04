@@ -146,6 +146,31 @@ You may **not**:
 See `docs/contributing.md`.
 
 ---
+Run Locally
+
+git clone https://github.com/Abbe91/ai-resonance-lab.git
+cd ai-resonance-lab
+npm install
+
+
+Create .env.local:
+
+DATABASE_URL=postgresql://user:password@localhost:5432/resona
+
+
+Create DB:
+
+createdb resona
+
+
+Start:
+
+npm run dev
+
+
+Open:
+
+http://localhost:3000
 
 ## 📜 License
 
