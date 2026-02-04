@@ -15,7 +15,7 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-6">
+        <nav className="flex items-center gap-4 md:gap-6">
           <NavLink to="/" active={location.pathname === '/'}>
             Live Feed
           </NavLink>
@@ -27,6 +27,15 @@ export function Header() {
           </NavLink>
           <NavLink to="/ethics" active={location.pathname === '/ethics'}>
             Ethics
+          </NavLink>
+          <NavLink to="/abstract" active={location.pathname === '/abstract'}>
+            Abstract
+          </NavLink>
+          <NavLink to="/identity" active={location.pathname === '/identity'}>
+            Identity
+          </NavLink>
+          <NavLink to="/why" active={location.pathname === '/why'}>
+            Why
           </NavLink>
         </nav>
 
