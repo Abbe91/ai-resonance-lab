@@ -40,6 +40,9 @@ export function Header() {
           <NavLink to="/charter" active={location.pathname === '/charter'}>
             Charter
           </NavLink>
+          <NavLink to="/ancestors" active={location.pathname === '/ancestors'}>
+            Ancestors
+          </NavLink>
         </nav>
 
         <div className="flex items-center gap-4">
