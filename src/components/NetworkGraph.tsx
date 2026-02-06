@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useRealtimeAgents } from '@/hooks/useRealtimeAgents';
+import { useRealtimeAgents, useAgentsPerformanceMode } from '@/hooks/useRealtimeAgents';
 import { useRealtimeRelationships } from '@/hooks/useRealtimeRelationships';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -27,6 +27,8 @@ interface Archetype {
   name: string;
 }
 
+type PerformanceMode = 'full' | 'sample300' | 'last500';
+
 type RelationshipState = 'strangers' | 'contact' | 'resonance' | 'bond' | 'drift' | 'dormant' | 'rupture';
 
 const stateColors: Record<RelationshipState, string> = {
@@ -42,7 +44,16 @@ const stateColors: Record<RelationshipState, string> = {
 const lineageColor = '#A78BFA'; // Soft violet for lineage edges
 
 export function NetworkGraph() {
-  const { agents, loading: agentsLoading } = useRealtimeAgents();
+  const [performanceMode, setPerformanceMode] = useState<PerformanceMode>('full');
+  
+  // Use full agents hook or performance mode hook based on selection
+  const fullAgentsHook = useRealtimeAgents();
+  const perfAgentsHook = useAgentsPerformanceMode(performanceMode);
+  
+  const { agents, totalCount, loading: agentsLoading } = performanceMode === 'full' 
+    ? fullAgentsHook 
+    : perfAgentsHook;
+  
   const { relationships, loading: relationshipsLoading } = useRealtimeRelationships();
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -54,6 +65,16 @@ export function NetworkGraph() {
   const [showLineage, setShowLineage] = useState(false);
   const [archetypes, setArchetypes] = useState<Archetype[]>([]);
   const animationRef = useRef<number>();
+
+  // Calculate connected agents count
+  const connectedAgentsCount = useMemo(() => {
+    const ids = new Set<string>();
+    relationships.forEach(r => {
+      ids.add(r.entityAId);
+      ids.add(r.entityBId);
+    });
+    return ids.size;
+  }, [relationships]);
 
   // Fetch archetypes
   useEffect(() => {
@@ -135,11 +156,16 @@ export function NetworkGraph() {
       const nodeCount = newNodes.length;
       
       // Scale forces for population size
-      const repulsionStrength = nodeCount > 100 ? 800 : nodeCount > 50 ? 2000 : 5000;
+      const repulsionStrength = nodeCount > 200 ? 400 : nodeCount > 100 ? 800 : nodeCount > 50 ? 2000 : 5000;
 
-      // Apply forces
+      // Apply forces - skip more for very large populations
+      const skipFactor = nodeCount > 300 ? 3 : nodeCount > 150 ? 2 : 1;
+
       for (let i = 0; i < newNodes.length; i++) {
         for (let j = i + 1; j < newNodes.length; j++) {
+          // Skip some pairs for performance in large graphs
+          if (skipFactor > 1 && (i + j) % skipFactor !== 0) continue;
+
           const dx = newNodes[j].x - newNodes[i].x;
           const dy = newNodes[j].y - newNodes[i].y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -274,7 +300,7 @@ export function NetworkGraph() {
     const agentNodes = nodes.filter(n => !n.isArchetype);
     const archetypeNodes = nodes.filter(n => n.isArchetype);
     const nodeCount = agentNodes.length;
-    const baseRadius = nodeCount > 150 ? 10 : nodeCount > 80 ? 14 : 24;
+    const baseRadius = nodeCount > 300 ? 6 : nodeCount > 150 ? 10 : nodeCount > 80 ? 14 : 24;
 
     // Draw agent nodes
     agentNodes.forEach(node => {
@@ -408,7 +434,8 @@ export function NetworkGraph() {
     );
   }
 
-  const agentNodeCount = nodes.filter(n => !n.isArchetype).length;
+  const displayedAgentCount = agents.length;
+  const isShowingPartial = performanceMode !== 'full';
 
   return (
     <div ref={containerRef} className="glass-card p-6">
@@ -416,10 +443,51 @@ export function NetworkGraph() {
         <div>
           <h2 className="text-lg font-medium text-foreground">Relationship Network</h2>
           <p className="text-xs font-mono text-muted-foreground/60 mt-1">
-            {agentNodeCount} agents · {connectedAgentIds.size} connected · {edges.length} relationships
+            {totalCount} total agents · {connectedAgentsCount} connected · {relationships.length} relationships
+            {isShowingPartial && (
+              <span className="text-amber-500/70 ml-2">
+                (showing {displayedAgentCount})
+              </span>
+            )}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Performance Mode Toggle */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPerformanceMode('full')}
+              className={`text-xs font-mono px-2 py-1 rounded transition-colors ${
+                performanceMode === 'full'
+                  ? 'bg-primary/20 text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Show all agents"
+            >
+              All
+            </button>
+            <button
+              onClick={() => setPerformanceMode('sample300')}
+              className={`text-xs font-mono px-2 py-1 rounded transition-colors ${
+                performanceMode === 'sample300'
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Performance mode: Sample 300 agents"
+            >
+              Sample
+            </button>
+            <button
+              onClick={() => setPerformanceMode('last500')}
+              className={`text-xs font-mono px-2 py-1 rounded transition-colors ${
+                performanceMode === 'last500'
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Performance mode: Last 500 newborns"
+            >
+              Recent
+            </button>
+          </div>
           <button
             onClick={() => setShowLineage(!showLineage)}
             className={`text-xs font-mono px-3 py-1.5 rounded-md border transition-colors ${
