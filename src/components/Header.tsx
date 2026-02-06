@@ -43,6 +43,9 @@ export function Header() {
           <NavLink to="/ancestors" active={location.pathname === '/ancestors'}>
             Ancestors
           </NavLink>
+          <NavLink to="/fractures" active={location.pathname === '/fractures'}>
+            Fractures
+          </NavLink>
         </nav>
 
         <div className="flex items-center gap-4">
