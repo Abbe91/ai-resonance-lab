@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { entities, relationships } from '@/lib/data';
-import { RelationshipState } from '@/lib/types';
 import { Link } from 'react-router-dom';
+import { useRealtimeAgents } from '@/hooks/useRealtimeAgents';
+import { useRealtimeRelationships } from '@/hooks/useRealtimeRelationships';
 
 interface Node {
   id: string;
@@ -16,8 +16,10 @@ interface Node {
 interface Edge {
   source: string;
   target: string;
-  state: RelationshipState;
+  state: string;
 }
+
+type RelationshipState = 'strangers' | 'contact' | 'resonance' | 'bond' | 'drift' | 'dormant' | 'rupture';
 
 const stateColors: Record<RelationshipState, string> = {
   strangers: '#666',
@@ -30,24 +32,43 @@ const stateColors: Record<RelationshipState, string> = {
 };
 
 export function NetworkGraph() {
+  const { agents, loading: agentsLoading } = useRealtimeAgents();
+  const { relationships, loading: relationshipsLoading } = useRealtimeRelationships();
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [connectedAgentIds, setConnectedAgentIds] = useState<Set<string>>(new Set());
   const animationRef = useRef<number>();
 
-  // Initialize nodes and edges
+  // Initialize nodes and edges from ALL agents
   useEffect(() => {
-    const initialNodes: Node[] = entities.map((entity, index) => {
-      const angle = (index * 2 * Math.PI) / entities.length;
-      const radius = 150;
+    if (agentsLoading || relationshipsLoading) return;
+
+    // Track connected agents for styling
+    const agentIdsWithRelationships = new Set(
+      relationships.flatMap(r => [r.entityAId, r.entityBId])
+    );
+    setConnectedAgentIds(agentIdsWithRelationships);
+
+    // Show ALL agents - use spiral layout for large populations
+    const totalAgents = agents.length;
+    const spiralSpacing = Math.max(30, Math.min(60, 150 / Math.sqrt(totalAgents)));
+
+    const initialNodes: Node[] = agents.map((agent, index) => {
+      const angle = index * 0.5;
+      const radius = spiralSpacing * Math.sqrt(index + 1);
+      const maxRadius = 180;
+      const clampedRadius = Math.min(radius, maxRadius);
+      
       return {
-        id: entity.id,
-        label: entity.name,
-        designation: entity.designation,
-        x: 300 + Math.cos(angle) * radius,
-        y: 250 + Math.sin(angle) * radius,
+        id: agent.id,
+        label: agent.name,
+        designation: agent.designation,
+        x: 300 + Math.cos(angle) * clampedRadius + (Math.random() - 0.5) * 20,
+        y: 250 + Math.sin(angle) * clampedRadius + (Math.random() - 0.5) * 20,
         vx: 0,
         vy: 0,
       };
@@ -61,12 +82,17 @@ export function NetworkGraph() {
 
     setNodes(initialNodes);
     setEdges(initialEdges);
-  }, []);
+  }, [agents, relationships, agentsLoading, relationshipsLoading]);
 
-  // Force simulation
+  // Force simulation - optimized for large populations
   const simulate = useCallback(() => {
     setNodes(prevNodes => {
+      if (prevNodes.length === 0) return prevNodes;
       const newNodes = prevNodes.map(node => ({ ...node }));
+      const nodeCount = newNodes.length;
+      
+      // Scale forces for population size
+      const repulsionStrength = nodeCount > 100 ? 800 : nodeCount > 50 ? 2000 : 5000;
 
       // Apply forces
       for (let i = 0; i < newNodes.length; i++) {
@@ -75,8 +101,15 @@ export function NetworkGraph() {
           const dy = newNodes[j].y - newNodes[i].y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           
-          // Repulsion
-          const repulsion = 5000 / (dist * dist);
+          // Skip distant nodes for performance
+          if (nodeCount > 100 && dist > 150) continue;
+          
+          // Softer repulsion for isolated nodes
+          const isIConnected = connectedAgentIds.has(newNodes[i].id);
+          const isJConnected = connectedAgentIds.has(newNodes[j].id);
+          const modifier = (!isIConnected && !isJConnected) ? 0.3 : 1;
+          
+          const repulsion = (repulsionStrength * modifier) / (dist * dist);
           const fx = (dx / dist) * repulsion;
           const fy = (dy / dist) * repulsion;
           
@@ -87,16 +120,23 @@ export function NetworkGraph() {
         }
 
         // Center gravity
+        const isConnected = connectedAgentIds.has(newNodes[i].id);
+        const gravity = isConnected ? 0.001 : 0.0005;
         const cx = 300 - newNodes[i].x;
         const cy = 250 - newNodes[i].y;
-        newNodes[i].vx += cx * 0.001;
-        newNodes[i].vy += cy * 0.001;
+        newNodes[i].vx += cx * gravity;
+        newNodes[i].vy += cy * gravity;
 
         // Apply velocity with damping
         newNodes[i].x += newNodes[i].vx * 0.1;
         newNodes[i].y += newNodes[i].vy * 0.1;
-        newNodes[i].vx *= 0.95;
-        newNodes[i].vy *= 0.95;
+        newNodes[i].vx *= 0.92;
+        newNodes[i].vy *= 0.92;
+        
+        // Boundary constraints
+        const margin = 30;
+        newNodes[i].x = Math.max(margin, Math.min(600 - margin, newNodes[i].x));
+        newNodes[i].y = Math.max(margin, Math.min(500 - margin, newNodes[i].y));
       }
 
       // Attraction along edges
@@ -107,7 +147,8 @@ export function NetworkGraph() {
           const dx = target.x - source.x;
           const dy = target.y - source.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const attraction = (dist - 180) * 0.01;
+          const idealDist = nodeCount > 100 ? 80 : 120;
+          const attraction = (dist - idealDist) * 0.008;
           const fx = (dx / dist) * attraction;
           const fy = (dy / dist) * attraction;
           source.vx += fx;
@@ -121,7 +162,7 @@ export function NetworkGraph() {
     });
 
     animationRef.current = requestAnimationFrame(simulate);
-  }, [edges]);
+  }, [edges, connectedAgentIds]);
 
   // Start simulation
   useEffect(() => {
@@ -158,19 +199,24 @@ export function NetworkGraph() {
       ctx.beginPath();
       ctx.moveTo(source.x, source.y);
       ctx.lineTo(target.x, target.y);
-      ctx.strokeStyle = stateColors[edge.state];
+      ctx.strokeStyle = stateColors[edge.state as RelationshipState] || '#666';
       ctx.lineWidth = edge.state === 'resonance' ? 2 : 1;
       ctx.globalAlpha = edge.state === 'dormant' ? 0.3 : 0.6;
       ctx.stroke();
       ctx.globalAlpha = 1;
     });
 
-    // Draw nodes
+    // Draw nodes - with styling for isolated vs connected
+    const nodeCount = nodes.length;
+    const baseRadius = nodeCount > 150 ? 10 : nodeCount > 80 ? 14 : 24;
+
     nodes.forEach(node => {
       const isHovered = hoveredNode === node.id;
-      const radius = isHovered ? 28 : 24;
+      const isConnected = connectedAgentIds.has(node.id);
+      const radius = isHovered ? baseRadius + 4 : (isConnected ? baseRadius : baseRadius * 0.6);
+      const baseOpacity = isConnected ? 1 : 0.3;
 
-      // Glow effect
+      // Glow effect for hovered
       if (isHovered) {
         const gradient = ctx.createRadialGradient(
           node.x, node.y, radius,
@@ -184,28 +230,37 @@ export function NetworkGraph() {
         ctx.fill();
       }
 
+      ctx.globalAlpha = isHovered ? 1 : baseOpacity;
+
       // Node circle
       ctx.beginPath();
       ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = isHovered ? 'hsl(220, 15%, 12%)' : 'hsl(220, 15%, 8%)';
+      ctx.fillStyle = isHovered ? 'hsl(220, 15%, 12%)' : (isConnected ? 'hsl(220, 15%, 8%)' : 'hsl(220, 15%, 5%)');
       ctx.fill();
-      ctx.strokeStyle = isHovered ? 'hsl(175, 60%, 45%)' : 'hsl(220, 15%, 20%)';
+      ctx.strokeStyle = isHovered ? 'hsl(175, 60%, 45%)' : (isConnected ? 'hsl(220, 15%, 20%)' : 'hsl(220, 15%, 15%)');
       ctx.lineWidth = isHovered ? 2 : 1;
       ctx.stroke();
 
-      // Label
-      ctx.fillStyle = isHovered ? 'hsl(175, 60%, 45%)' : 'hsl(220, 10%, 85%)';
-      ctx.font = '12px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(node.label, node.x, node.y);
+      // Label - only for connected or hovered in large graphs
+      const showLabel = isHovered || (isConnected && nodeCount < 80) || nodeCount < 30;
+      if (showLabel) {
+        ctx.fillStyle = isHovered ? 'hsl(175, 60%, 45%)' : (isConnected ? 'hsl(220, 10%, 85%)' : 'hsl(220, 10%, 55%)');
+        ctx.font = `${nodeCount > 80 ? 9 : 12}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(node.label, node.x, node.y);
+      }
 
-      // Designation below
-      ctx.fillStyle = 'hsl(220, 10%, 50%)';
-      ctx.font = '9px JetBrains Mono, monospace';
-      ctx.fillText(node.designation, node.x, node.y + radius + 12);
+      // Designation below (only for hovered or small graphs with connected)
+      if (isHovered || (isConnected && nodeCount < 30)) {
+        ctx.fillStyle = 'hsl(220, 10%, 50%)';
+        ctx.font = '8px JetBrains Mono, monospace';
+        ctx.fillText(node.designation, node.x, node.y + radius + 10);
+      }
+
+      ctx.globalAlpha = 1;
     });
-  }, [nodes, edges, hoveredNode]);
+  }, [nodes, edges, hoveredNode, connectedAgentIds]);
 
   // Mouse interaction
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -225,10 +280,31 @@ export function NetworkGraph() {
     setHoveredNode(hovered?.id || null);
   };
 
+  if (agentsLoading || relationshipsLoading) {
+    return (
+      <div ref={containerRef} className="glass-card p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-medium text-foreground">Relationship Network</h2>
+        </div>
+        <div className="h-[400px] flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-muted-foreground text-sm">Loading network...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={containerRef} className="glass-card p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-medium text-foreground">Relationship Network</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-medium text-foreground">Relationship Network</h2>
+          <p className="text-xs font-mono text-muted-foreground/60 mt-1">
+            {nodes.length} agents · {connectedAgentIds.size} connected · {edges.length} relationships
+          </p>
+        </div>
         <Link 
           to="/graph" 
           className="text-xs text-muted-foreground hover:text-foreground transition-colors font-mono"
