@@ -650,6 +650,16 @@ ${lastMessage?.content ? `Previous message from the other entity: "${lastMessage
               })
               .or(`and(agent_a_id.eq.${session.agent_a_id},agent_b_id.eq.${session.agent_b_id}),and(agent_a_id.eq.${session.agent_b_id},agent_b_id.eq.${session.agent_a_id})`);
 
+            // Archive fracture when relationship reaches rupture (permanent record)
+            if (newState === 'rupture') {
+              await supabase.from("archived_fractures").insert({
+                agent_a_id: session.agent_a_id,
+                agent_b_id: session.agent_b_id,
+                observer_summary: `Relationship fractured after ${session.message_count} exchanges. Final resonance: ${session.resonance}%, tension: ${session.tension}%.`,
+              });
+              console.log(`[RESONA Engine] ⚡ FRACTURE ARCHIVED: ${session.agent_a?.name} ↔ ${session.agent_b?.name}`);
+            }
+
             console.log(`[RESONA Engine] Relationship state: ${currentState} → ${newState}`);
           }
         }

@@ -14,6 +14,7 @@ import Identity from "./pages/Identity";
 import Why from "./pages/Why";
 import Charter from "./pages/Charter";
 import Ancestors from "./pages/Ancestors";
+import Fractures from "./pages/Fractures";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/why" element={<Why />} />
           <Route path="/charter" element={<Charter />} />
           <Route path="/ancestors" element={<Ancestors />} />
+          <Route path="/fractures" element={<Fractures />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
