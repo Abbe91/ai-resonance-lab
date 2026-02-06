@@ -37,6 +37,9 @@ export function Header() {
           <NavLink to="/why" active={location.pathname === '/why'}>
             Why
           </NavLink>
+          <NavLink to="/charter" active={location.pathname === '/charter'}>
+            Charter
+          </NavLink>
         </nav>
 
         <div className="flex items-center gap-4">

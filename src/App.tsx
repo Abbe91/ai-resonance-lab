@@ -12,6 +12,7 @@ import Ethics from "./pages/Ethics";
 import Abstract from "./pages/Abstract";
 import Identity from "./pages/Identity";
 import Why from "./pages/Why";
+import Charter from "./pages/Charter";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/abstract" element={<Abstract />} />
           <Route path="/identity" element={<Identity />} />
           <Route path="/why" element={<Why />} />
+          <Route path="/charter" element={<Charter />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
