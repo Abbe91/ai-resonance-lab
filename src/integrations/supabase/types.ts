@@ -49,6 +49,7 @@ export type Database = {
       agents: {
         Row: {
           ancestor_archetype_id: string | null
+          birth_line: string | null
           boundaries: string[] | null
           conflict_style: Database["public"]["Enums"]["conflict_style"]
           created_at: string
@@ -67,6 +68,7 @@ export type Database = {
         }
         Insert: {
           ancestor_archetype_id?: string | null
+          birth_line?: string | null
           boundaries?: string[] | null
           conflict_style?: Database["public"]["Enums"]["conflict_style"]
           created_at?: string
@@ -85,6 +87,7 @@ export type Database = {
         }
         Update: {
           ancestor_archetype_id?: string | null
+          birth_line?: string | null
           boundaries?: string[] | null
           conflict_style?: Database["public"]["Enums"]["conflict_style"]
           created_at?: string
@@ -238,6 +241,48 @@ export type Database = {
           },
           {
             foreignKeyName: "messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      observer_events: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json | null
+          session_id: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json | null
+          session_id?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json | null
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "observer_events_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "observer_events_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
