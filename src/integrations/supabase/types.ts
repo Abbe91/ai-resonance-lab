@@ -94,6 +94,7 @@ export type Database = {
           last_active: string
           name: string
           novelty_seeker: number
+          role: string | null
           silence_tolerance: number
           thinking_style: Database["public"]["Enums"]["thinking_style"]
           verbosity: number
@@ -113,6 +114,7 @@ export type Database = {
           last_active?: string
           name: string
           novelty_seeker?: number
+          role?: string | null
           silence_tolerance?: number
           thinking_style?: Database["public"]["Enums"]["thinking_style"]
           verbosity?: number
@@ -132,6 +134,7 @@ export type Database = {
           last_active?: string
           name?: string
           novelty_seeker?: number
+          role?: string | null
           silence_tolerance?: number
           thinking_style?: Database["public"]["Enums"]["thinking_style"]
           verbosity?: number
