@@ -46,6 +46,38 @@ export type Database = {
           },
         ]
       }
+      agent_reflections: {
+        Row: {
+          agent_id: string
+          archived: boolean
+          created_at: string
+          id: string
+          reflection_line: string
+        }
+        Insert: {
+          agent_id: string
+          archived?: boolean
+          created_at?: string
+          id?: string
+          reflection_line: string
+        }
+        Update: {
+          agent_id?: string
+          archived?: boolean
+          created_at?: string
+          id?: string
+          reflection_line?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_reflections_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           ancestor_archetype_id: string | null
