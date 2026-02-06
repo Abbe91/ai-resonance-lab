@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useRealtimeAgents } from '@/hooks/useRealtimeAgents';
 import { useRealtimeRelationships } from '@/hooks/useRealtimeRelationships';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Node {
   id: string;
@@ -11,12 +12,19 @@ interface Node {
   y: number;
   vx: number;
   vy: number;
+  isArchetype?: boolean;
+  ancestorArchetypeId?: string | null;
 }
 
 interface Edge {
   source: string;
   target: string;
   state: string;
+}
+
+interface Archetype {
+  id: string;
+  name: string;
 }
 
 type RelationshipState = 'strangers' | 'contact' | 'resonance' | 'bond' | 'drift' | 'dormant' | 'rupture';
@@ -31,6 +39,8 @@ const stateColors: Record<RelationshipState, string> = {
   rupture: '#EF4444',
 };
 
+const lineageColor = '#A78BFA'; // Soft violet for lineage edges
+
 export function NetworkGraph() {
   const { agents, loading: agentsLoading } = useRealtimeAgents();
   const { relationships, loading: relationshipsLoading } = useRealtimeRelationships();
@@ -41,7 +51,20 @@ export function NetworkGraph() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [connectedAgentIds, setConnectedAgentIds] = useState<Set<string>>(new Set());
+  const [showLineage, setShowLineage] = useState(false);
+  const [archetypes, setArchetypes] = useState<Archetype[]>([]);
   const animationRef = useRef<number>();
+
+  // Fetch archetypes
+  useEffect(() => {
+    const fetchArchetypes = async () => {
+      const { data } = await supabase
+        .from('ancestor_archetypes')
+        .select('id, name');
+      if (data) setArchetypes(data);
+    };
+    fetchArchetypes();
+  }, []);
 
   // Initialize nodes and edges from ALL agents
   useEffect(() => {
@@ -71,8 +94,28 @@ export function NetworkGraph() {
         y: 250 + Math.sin(angle) * clampedRadius + (Math.random() - 0.5) * 20,
         vx: 0,
         vy: 0,
+        ancestorArchetypeId: agent.ancestorArchetypeId || null,
       };
     });
+
+    // Add archetype nodes when lineage view is active
+    if (showLineage && archetypes.length > 0) {
+      const archetypeNodes: Node[] = archetypes.map((archetype, index) => {
+        const angle = (index / archetypes.length) * Math.PI * 2 - Math.PI / 2;
+        const radius = 220;
+        return {
+          id: `archetype-${archetype.id}`,
+          label: archetype.name,
+          designation: 'ARCHETYPE',
+          x: 300 + Math.cos(angle) * radius,
+          y: 250 + Math.sin(angle) * radius,
+          vx: 0,
+          vy: 0,
+          isArchetype: true,
+        };
+      });
+      initialNodes.push(...archetypeNodes);
+    }
 
     const initialEdges: Edge[] = relationships.map(rel => ({
       source: rel.entityAId,
@@ -82,7 +125,7 @@ export function NetworkGraph() {
 
     setNodes(initialNodes);
     setEdges(initialEdges);
-  }, [agents, relationships, agentsLoading, relationshipsLoading]);
+  }, [agents, relationships, agentsLoading, relationshipsLoading, showLineage, archetypes]);
 
   // Force simulation - optimized for large populations
   const simulate = useCallback(() => {
@@ -190,7 +233,28 @@ export function NetworkGraph() {
     // Clear
     ctx.clearRect(0, 0, 600, 500);
 
-    // Draw edges
+    // Draw lineage edges (dashed) when lineage view is active
+    if (showLineage) {
+      nodes.forEach(node => {
+        if (node.isArchetype || !node.ancestorArchetypeId) return;
+        
+        const archetypeNode = nodes.find(n => n.id === `archetype-${node.ancestorArchetypeId}`);
+        if (!archetypeNode) return;
+
+        ctx.beginPath();
+        ctx.setLineDash([4, 6]);
+        ctx.moveTo(node.x, node.y);
+        ctx.lineTo(archetypeNode.x, archetypeNode.y);
+        ctx.strokeStyle = lineageColor;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.25;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      });
+    }
+
+    // Draw relationship edges
     edges.forEach(edge => {
       const source = nodes.find(n => n.id === edge.source);
       const target = nodes.find(n => n.id === edge.target);
@@ -207,10 +271,13 @@ export function NetworkGraph() {
     });
 
     // Draw nodes - with styling for isolated vs connected
-    const nodeCount = nodes.length;
+    const agentNodes = nodes.filter(n => !n.isArchetype);
+    const archetypeNodes = nodes.filter(n => n.isArchetype);
+    const nodeCount = agentNodes.length;
     const baseRadius = nodeCount > 150 ? 10 : nodeCount > 80 ? 14 : 24;
 
-    nodes.forEach(node => {
+    // Draw agent nodes
+    agentNodes.forEach(node => {
       const isHovered = hoveredNode === node.id;
       const isConnected = connectedAgentIds.has(node.id);
       const radius = isHovered ? baseRadius + 4 : (isConnected ? baseRadius : baseRadius * 0.6);
@@ -260,7 +327,52 @@ export function NetworkGraph() {
 
       ctx.globalAlpha = 1;
     });
-  }, [nodes, edges, hoveredNode, connectedAgentIds]);
+
+    // Draw archetype nodes when lineage view is active
+    if (showLineage) {
+      archetypeNodes.forEach(node => {
+        const isHovered = hoveredNode === node.id;
+        const radius = 18;
+
+        // Soft glow for archetypes
+        const gradient = ctx.createRadialGradient(
+          node.x, node.y, radius * 0.5,
+          node.x, node.y, radius * 2
+        );
+        gradient.addColorStop(0, 'rgba(167, 139, 250, 0.15)');
+        gradient.addColorStop(1, 'rgba(167, 139, 250, 0)');
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, radius * 2, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Archetype node - diamond shape
+        ctx.beginPath();
+        ctx.moveTo(node.x, node.y - radius);
+        ctx.lineTo(node.x + radius, node.y);
+        ctx.lineTo(node.x, node.y + radius);
+        ctx.lineTo(node.x - radius, node.y);
+        ctx.closePath();
+        ctx.fillStyle = 'hsl(260, 20%, 10%)';
+        ctx.fill();
+        ctx.strokeStyle = isHovered ? lineageColor : 'hsl(260, 30%, 35%)';
+        ctx.lineWidth = isHovered ? 2 : 1;
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = lineageColor;
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(node.label, node.x, node.y);
+
+        // Designation
+        ctx.fillStyle = 'hsl(260, 20%, 50%)';
+        ctx.font = '7px JetBrains Mono, monospace';
+        ctx.fillText(node.designation, node.x, node.y + radius + 8);
+      });
+    }
+  }, [nodes, edges, hoveredNode, connectedAgentIds, showLineage]);
 
   // Mouse interaction
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -296,21 +408,35 @@ export function NetworkGraph() {
     );
   }
 
+  const agentNodeCount = nodes.filter(n => !n.isArchetype).length;
+
   return (
     <div ref={containerRef} className="glass-card p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-medium text-foreground">Relationship Network</h2>
           <p className="text-xs font-mono text-muted-foreground/60 mt-1">
-            {nodes.length} agents · {connectedAgentIds.size} connected · {edges.length} relationships
+            {agentNodeCount} agents · {connectedAgentIds.size} connected · {edges.length} relationships
           </p>
         </div>
-        <Link 
-          to="/graph" 
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors font-mono"
-        >
-          Expand →
-        </Link>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowLineage(!showLineage)}
+            className={`text-xs font-mono px-3 py-1.5 rounded-md border transition-colors ${
+              showLineage 
+                ? 'border-violet-500/50 bg-violet-500/10 text-violet-400' 
+                : 'border-border/50 text-muted-foreground hover:text-foreground hover:border-border'
+            }`}
+          >
+            {showLineage ? '◆ Lineage' : '◇ Lineage'}
+          </button>
+          <Link 
+            to="/graph" 
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors font-mono"
+          >
+            Expand →
+          </Link>
+        </div>
       </div>
       <canvas
         ref={canvasRef}
@@ -320,7 +446,7 @@ export function NetworkGraph() {
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoveredNode(null)}
         onClick={() => {
-          if (hoveredNode) {
+          if (hoveredNode && !hoveredNode.startsWith('archetype-')) {
             window.location.href = `/entity/${hoveredNode}`;
           }
         }}
@@ -336,6 +462,18 @@ export function NetworkGraph() {
             <span className="text-xs text-muted-foreground capitalize">{state}</span>
           </div>
         ))}
+        {showLineage && (
+          <div className="flex items-center gap-2">
+            <span 
+              className="w-3 h-3 rotate-45" 
+              style={{ 
+                backgroundColor: 'transparent', 
+                border: `1.5px dashed ${lineageColor}`,
+              }}
+            />
+            <span className="text-xs text-muted-foreground">lineage</span>
+          </div>
+        )}
       </div>
     </div>
   );

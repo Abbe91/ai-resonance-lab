@@ -20,6 +20,7 @@ export interface RealtimeAgent {
   boundaries: string[];
   createdAt: Date;
   lastActive: Date;
+  ancestorArchetypeId: string | null;
 }
 
 function transformAgent(agent: DBAgent): RealtimeAgent {
@@ -41,6 +42,7 @@ function transformAgent(agent: DBAgent): RealtimeAgent {
     boundaries: agent.boundaries || [],
     createdAt: new Date(agent.created_at),
     lastActive: new Date(agent.last_active),
+    ancestorArchetypeId: agent.ancestor_archetype_id || null,
   };
 }
 

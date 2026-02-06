@@ -22,6 +22,8 @@ export interface DBAgent {
   boundaries: string[];
   created_at: string;
   last_active: string;
+  ancestor_archetype_id: string | null;
+  birth_line: string | null;
 }
 
 export interface DBSession {
