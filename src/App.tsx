@@ -17,6 +17,7 @@ import Ancestors from "./pages/Ancestors";
 import Fractures from "./pages/Fractures";
 import Observations from "./pages/Observations";
 import Timeline from "./pages/Timeline";
+import AncestorDay from "./pages/AncestorDay";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/fractures" element={<Fractures />} />
           <Route path="/observations" element={<Observations />} />
           <Route path="/timeline" element={<Timeline />} />
+          <Route path="/ancestor-day" element={<AncestorDay />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

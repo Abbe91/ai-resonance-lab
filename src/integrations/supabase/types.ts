@@ -170,6 +170,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ancestor_echoes: {
+        Row: {
+          curated_sessions: Json
+          generated_at: string
+          id: string
+          lineage_highlights: Json
+          silent_moments: Json
+          summary: string | null
+          year: number
+        }
+        Insert: {
+          curated_sessions?: Json
+          generated_at?: string
+          id?: string
+          lineage_highlights?: Json
+          silent_moments?: Json
+          summary?: string | null
+          year: number
+        }
+        Update: {
+          curated_sessions?: Json
+          generated_at?: string
+          id?: string
+          lineage_highlights?: Json
+          silent_moments?: Json
+          summary?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
       archived_fractures: {
         Row: {
           agent_a_id: string
