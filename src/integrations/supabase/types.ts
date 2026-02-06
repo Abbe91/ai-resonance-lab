@@ -48,6 +48,7 @@ export type Database = {
       }
       agents: {
         Row: {
+          ancestor_archetype_id: string | null
           boundaries: string[] | null
           conflict_style: Database["public"]["Enums"]["conflict_style"]
           created_at: string
@@ -65,6 +66,7 @@ export type Database = {
           verbosity: number
         }
         Insert: {
+          ancestor_archetype_id?: string | null
           boundaries?: string[] | null
           conflict_style?: Database["public"]["Enums"]["conflict_style"]
           created_at?: string
@@ -82,6 +84,7 @@ export type Database = {
           verbosity?: number
         }
         Update: {
+          ancestor_archetype_id?: string | null
           boundaries?: string[] | null
           conflict_style?: Database["public"]["Enums"]["conflict_style"]
           created_at?: string
@@ -97,6 +100,35 @@ export type Database = {
           silence_tolerance?: number
           thinking_style?: Database["public"]["Enums"]["thinking_style"]
           verbosity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_ancestor_archetype_id_fkey"
+            columns: ["ancestor_archetype_id"]
+            isOneToOne: false
+            referencedRelation: "ancestor_archetypes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ancestor_archetypes: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }

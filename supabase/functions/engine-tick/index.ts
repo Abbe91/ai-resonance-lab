@@ -231,6 +231,20 @@ serve(async (req) => {
       const existingNames = new Set(existingAgents?.map(a => a.name) || []);
       const currentAgentCount = existingNames.size;
 
+      // Fetch ancestor archetypes for random assignment
+      const { data: archetypes } = await supabase
+        .from("ancestor_archetypes")
+        .select("id, name");
+      
+      // Randomly select an archetype (or null ~20% of the time for variety)
+      let ancestorArchetypeId: string | null = null;
+      let ancestorArchetypeName: string | null = null;
+      if (archetypes && archetypes.length > 0 && random() > 0.2) {
+        const selectedArchetype = archetypes[Math.floor(random() * archetypes.length)];
+        ancestorArchetypeId = selectedArchetype.id;
+        ancestorArchetypeName = selectedArchetype.name;
+      }
+
       // Generate unique name
       const name = generateUniqueName(existingNames, random);
       
@@ -254,6 +268,7 @@ serve(async (req) => {
           goals[Math.floor(random() * goals.length)]
         ],
         boundaries: [boundaries[Math.floor(random() * boundaries.length)]],
+        ancestor_archetype_id: ancestorArchetypeId,
       };
 
       const { data: newAgent, error: agentError } = await supabase
@@ -297,12 +312,14 @@ serve(async (req) => {
               curiosity: agent.curiosity,
               empathy: agent.empathy,
               silence_tolerance: agent.silence_tolerance,
+              ancestor_archetype: ancestorArchetypeName,
             },
             timestamp: new Date().toISOString(),
           }),
         });
 
-        console.log(`[RESONA Engine] 🌱 ORGANIC SPAWN: ${name} (${designation}) | Reason: ${spawnReason} | Network now has ${currentAgentCount + 1} entities`);
+        const archetypeLabel = ancestorArchetypeName ? ` [${ancestorArchetypeName}]` : '';
+        console.log(`[RESONA Engine] 🌱 ORGANIC SPAWN: ${name} (${designation})${archetypeLabel} | Reason: ${spawnReason} | Network now has ${currentAgentCount + 1} entities`);
 
         // Update engine state with spawn time
         await supabase
