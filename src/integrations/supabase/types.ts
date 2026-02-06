@@ -135,6 +135,48 @@ export type Database = {
         }
         Relationships: []
       }
+      archived_fractures: {
+        Row: {
+          agent_a_id: string
+          agent_b_id: string
+          created_at: string
+          fractured_at: string
+          id: string
+          observer_summary: string | null
+        }
+        Insert: {
+          agent_a_id: string
+          agent_b_id: string
+          created_at?: string
+          fractured_at?: string
+          id?: string
+          observer_summary?: string | null
+        }
+        Update: {
+          agent_a_id?: string
+          agent_b_id?: string
+          created_at?: string
+          fractured_at?: string
+          id?: string
+          observer_summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "archived_fractures_agent_a_id_fkey"
+            columns: ["agent_a_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "archived_fractures_agent_b_id_fkey"
+            columns: ["agent_b_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engine_state: {
         Row: {
           id: string
