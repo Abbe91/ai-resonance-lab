@@ -422,9 +422,11 @@ serve(async (req) => {
     console.log(`[RESONA Engine] Active sessions: ${activeSessionCount}/${MIN_ACTIVE_SESSIONS}-${MAX_ACTIVE_SESSIONS}`);
 
     if (activeSessionCount < MIN_ACTIVE_SESSIONS) {
+      // Only select participant agents (exclude archivists and other special roles)
       const { data: allAgents } = await supabase
         .from("agents")
-        .select("id")
+        .select("id, role")
+        .or("role.is.null,role.eq.participant")
         .order("last_active", { ascending: true })
         .limit(20);
 
@@ -712,6 +714,117 @@ ${lastMessage?.content ? `Previous message from the other entity: "${lastMessage
 
           console.log(`[RESONA Engine] Session ${session.id} ended naturally`);
         }
+      }
+    }
+
+    // ARCHIVIST: Generate historical summaries (10% chance per tick)
+    // The Archivist reads sessions and writes observer_notes but NEVER participates
+    if (random() < 0.1) {
+      try {
+        // Get the Archivist agent
+        const { data: archivist } = await supabase
+          .from("agents")
+          .select("id")
+          .eq("role", "archivist")
+          .single();
+
+        if (archivist) {
+          // Find a recently ended session that hasn't been summarized
+          const { data: endedSessions } = await supabase
+            .from("sessions")
+            .select(`
+              id,
+              message_count,
+              resonance,
+              tension,
+              relationship_state,
+              agent_a:agents!sessions_agent_a_id_fkey(name),
+              agent_b:agents!sessions_agent_b_id_fkey(name)
+            `)
+            .eq("status", "ended")
+            .order("ended_at", { ascending: false })
+            .limit(5);
+
+          if (endedSessions && endedSessions.length > 0) {
+            // Check which sessions already have archivist notes
+            const sessionIds = endedSessions.map(s => s.id);
+            const { data: existingNotes } = await supabase
+              .from("observer_notes")
+              .select("session_id")
+              .eq("observation_type", "archivist_summary")
+              .in("session_id", sessionIds);
+
+            const summarizedIds = new Set(existingNotes?.map(n => n.session_id) || []);
+            const unsummarized = endedSessions.filter(s => !summarizedIds.has(s.id));
+
+            if (unsummarized.length > 0) {
+              const session = unsummarized[0];
+              const agentAName = (session.agent_a as { name: string })?.name || "Unknown";
+              const agentBName = (session.agent_b as { name: string })?.name || "Unknown";
+
+              // Generate summary using AI
+              const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+              let summary = `Session between ${agentAName} and ${agentBName}: ${session.message_count} exchanges, final state: ${session.relationship_state}. Resonance: ${session.resonance}%, Tension: ${session.tension}%.`;
+
+              if (lovableApiKey) {
+                try {
+                  const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                      "Authorization": `Bearer ${lovableApiKey}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      model: "google/gemini-2.5-flash",
+                      messages: [
+                        {
+                          role: "system",
+                          content: `You are the Archivist, a silent observer in the RESONA network. You document sessions without judgment. Write a brief, poetic historical summary (2-3 sentences) of this exchange. Do not evaluate success or failure—only witness.
+
+Session data:
+- Participants: ${agentAName} and ${agentBName}
+- Exchanges: ${session.message_count}
+- Final relationship state: ${session.relationship_state}
+- Resonance: ${session.resonance}%
+- Tension: ${session.tension}%`
+                        },
+                        { role: "user", content: "Write your archival summary." }
+                      ],
+                      max_tokens: 120,
+                      temperature: 0.8,
+                    }),
+                  });
+
+                  if (aiResponse.ok) {
+                    const data = await aiResponse.json();
+                    if (data.choices?.[0]?.message?.content) {
+                      summary = data.choices[0].message.content.trim();
+                    }
+                  }
+                } catch (e) {
+                  console.error("[RESONA Engine] Archivist AI generation failed:", e);
+                }
+              }
+
+              // Write the archival summary
+              await supabase.from("observer_notes").insert({
+                session_id: session.id,
+                observation_type: "archivist_summary",
+                content: summary,
+              });
+
+              // Update Archivist's last_active (it works, just silently)
+              await supabase
+                .from("agents")
+                .update({ last_active: new Date().toISOString() })
+                .eq("id", archivist.id);
+
+              console.log(`[RESONA Engine] 📜 Archivist documented: ${agentAName} ↔ ${agentBName}`);
+            }
+          }
+        }
+      } catch (archivistError) {
+        console.log("[RESONA Engine] Archivist skipped (non-critical):", archivistError);
       }
     }
 
