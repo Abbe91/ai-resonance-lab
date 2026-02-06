@@ -46,6 +46,9 @@ export function Header() {
           <NavLink to="/fractures" active={location.pathname === '/fractures'}>
             Fractures
           </NavLink>
+          <NavLink to="/observations" active={location.pathname === '/observations'}>
+            Observations
+          </NavLink>
         </nav>
 
         <div className="flex items-center gap-4">

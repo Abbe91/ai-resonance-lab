@@ -4,6 +4,7 @@ import { ConversationTimeline } from '@/components/ConversationTimeline';
 import { MetricsSidebar } from '@/components/MetricsSidebar';
 import { ObserverPanel } from '@/components/observer/ObserverPanel';
 import { ObserverDisclaimer } from '@/components/observer/ObserverDisclaimer';
+import { ArchivistNoteIndicator } from '@/components/ArchivistNoteIndicator';
 import { ArrowLeft } from 'lucide-react';
 import { useRealtimeSessions } from '@/hooks/useRealtimeSessions';
 import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
@@ -157,6 +158,9 @@ export default function SessionPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Archivist Note (if available) */}
+                <ArchivistNoteIndicator sessionId={session.id} />
               </div>
             </div>
 
