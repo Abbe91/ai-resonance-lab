@@ -15,6 +15,7 @@ const navLinks = [
   { to: '/fractures', label: 'Fractures' },
   { to: '/observations', label: 'Observations' },
   { to: '/timeline', label: 'Timeline' },
+  { to: '/ancestor-day', label: 'Echoes' },
 ];
 
 export function Header() {
