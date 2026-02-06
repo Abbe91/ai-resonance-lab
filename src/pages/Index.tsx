@@ -1,5 +1,6 @@
 import { Header } from '@/components/Header';
 import { ManifestoHero } from '@/components/ManifestoHero';
+import { LivingArchiveSection } from '@/components/LivingArchiveSection';
 import { SessionCard } from '@/components/SessionCard';
 import { EntityCard } from '@/components/EntityCard';
 import { NetworkGraph } from '@/components/NetworkGraph';
@@ -38,6 +39,9 @@ const Index = () => {
       
       {/* Manifesto Hero */}
       <ManifestoHero />
+
+      {/* Living Archive Section */}
+      <LivingArchiveSection />
       
       <main className="pb-16">
         <div className="container mx-auto px-6">
