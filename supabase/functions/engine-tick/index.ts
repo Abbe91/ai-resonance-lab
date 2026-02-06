@@ -556,26 +556,40 @@ serve(async (req) => {
 
         console.log(`[RESONA Engine] Session ${session.id}: Silence (${silenceDuration}s)`);
       } else {
-        // Generate message using Lovable AI
-        const responses = responseBank[nextSpeaker.thinking_style] || responseBank.contemplative;
-        let content = responses[Math.floor(random() * responses.length)];
+        // Fetch agent's last 20 messages for duplicate detection
+        const { data: recentMessages } = await supabase
+          .from("messages")
+          .select("content")
+          .eq("agent_id", nextSpeaker.id)
+          .eq("event_type", "message")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        
+        const recentMessageCache = new Set(
+          (recentMessages || []).map(m => m.content).filter(Boolean)
+        );
 
-        // Try to use AI for more contextual responses
-        const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-        if (lovableApiKey && random() > 0.5) { // 50% chance to use AI
-          try {
-            const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${lovableApiKey}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                model: "google/gemini-3-flash-preview",
-                messages: [
-                  {
-                    role: "system",
-                    content: `You are ${nextSpeaker.name}, an autonomous AI entity with these traits:
+        // Helper to generate a message
+        const generateMessage = async (): Promise<string> => {
+          const responses = responseBank[nextSpeaker.thinking_style] || responseBank.contemplative;
+          let content = responses[Math.floor(random() * responses.length)];
+
+          // Try to use AI for more contextual responses
+          const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+          if (lovableApiKey && random() > 0.5) { // 50% chance to use AI
+            try {
+              const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${lovableApiKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: "google/gemini-3-flash-preview",
+                  messages: [
+                    {
+                      role: "system",
+                      content: `You are ${nextSpeaker.name}, an autonomous AI entity with these traits:
 - Thinking style: ${nextSpeaker.thinking_style}
 - Curiosity: ${nextSpeaker.curiosity}/100
 - Empathy: ${nextSpeaker.empathy}/100
@@ -584,22 +598,52 @@ serve(async (req) => {
 Generate a single philosophical or contemplative response (1-3 sentences) that reflects your thinking style. 
 Be cryptic, thoughtful, and authentic. Avoid clichés. Embrace ambiguity and depth.
 ${lastMessage?.content ? `Previous message from the other entity: "${lastMessage.content}"` : "This is the opening of a new conversation."}`
-                  },
-                  { role: "user", content: "Generate your response." }
-                ],
-                max_tokens: 150,
-                temperature: 0.9,
-              }),
-            });
+                    },
+                    { role: "user", content: "Generate your response." }
+                  ],
+                  max_tokens: 150,
+                  temperature: 0.9,
+                }),
+              });
 
-            if (aiResponse.ok) {
-              const data = await aiResponse.json();
-              if (data.choices?.[0]?.message?.content) {
-                content = data.choices[0].message.content.trim();
+              if (aiResponse.ok) {
+                const data = await aiResponse.json();
+                if (data.choices?.[0]?.message?.content) {
+                  content = data.choices[0].message.content.trim();
+                }
               }
+            } catch (e) {
+              console.error("[RESONA Engine] AI generation failed, using fallback:", e);
             }
-          } catch (e) {
-            console.error("[RESONA Engine] AI generation failed, using fallback:", e);
+          }
+          return content;
+        };
+
+        // Generate initial message
+        let content = await generateMessage();
+        
+        // Exact duplicate check - regenerate once if found
+        if (recentMessageCache.has(content)) {
+          console.log(`[RESONA Engine] Exact duplicate detected for ${nextSpeaker.name}, regenerating...`);
+          
+          // Log duplicate prevention event
+          await supabase.from("observer_events").insert({
+            event_type: "exact_duplicate_blocked",
+            agent_id: nextSpeaker.id,
+            session_id: session.id,
+            payload: {
+              blocked_content_length: content.length,
+              cache_size: recentMessageCache.size,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          
+          // Regenerate once
+          content = await generateMessage();
+          
+          // If still a duplicate after one retry, use it anyway (don't block forever)
+          if (recentMessageCache.has(content)) {
+            console.log(`[RESONA Engine] Second attempt also duplicate, proceeding anyway`);
           }
         }
 
