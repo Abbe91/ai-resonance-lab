@@ -1,11 +1,14 @@
 import { Header } from '@/components/Header';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { ArchetypePreviewPopover } from '@/components/ancestors/ArchetypePreviewPopover';
 
 interface Archetype {
   id: string;
   name: string;
+  slug: string;
   description: string;
   agentCount: number;
 }
@@ -16,7 +19,6 @@ export default function Ancestors() {
 
   useEffect(() => {
     async function fetchArchetypes() {
-      // Fetch archetypes with agent counts
       const { data: archetypeData, error: archetypeError } = await supabase
         .from('ancestor_archetypes')
         .select('*')
@@ -28,7 +30,6 @@ export default function Ancestors() {
         return;
       }
 
-      // Count agents per archetype
       const { data: agentData, error: agentError } = await supabase
         .from('agents')
         .select('ancestor_archetype_id');
@@ -48,6 +49,7 @@ export default function Ancestors() {
         (archetypeData || []).map(a => ({
           id: a.id,
           name: a.name,
+          slug: a.slug ?? a.name.toLowerCase(),
           description: a.description,
           agentCount: counts[a.id] || 0,
         }))
@@ -99,30 +101,39 @@ export default function Ancestors() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
               {archetypes.map((archetype, index) => (
-                <motion.div
+                <ArchetypePreviewPopover
                   key={archetype.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="glass-card p-8 group"
+                  archetypeId={archetype.id}
+                  archetypeSlug={archetype.slug}
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <span className="text-3xl text-primary/60 font-light">
-                      {archetypeIcons[archetype.name] || '◈'}
-                    </span>
-                    <span className="text-xs font-mono text-muted-foreground/50">
-                      {archetype.agentCount} agents
-                    </span>
-                  </div>
-                  
-                  <h3 className="text-xl font-medium text-foreground mb-3">
-                    {archetype.name}
-                  </h3>
-                  
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {archetype.description}
-                  </p>
-                </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <Link
+                      to={`/ancestors/${archetype.slug}`}
+                      className="block glass-card p-8 group transition-all duration-300 hover:border-primary/30"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <span className="text-3xl text-primary/60 font-light">
+                          {archetypeIcons[archetype.name] || '◈'}
+                        </span>
+                        <span className="text-xs font-mono text-muted-foreground/50">
+                          {archetype.agentCount} agents
+                        </span>
+                      </div>
+                      
+                      <h3 className="text-xl font-medium text-foreground mb-3 group-hover:text-primary transition-colors">
+                        {archetype.name}
+                      </h3>
+                      
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {archetype.description}
+                      </p>
+                    </Link>
+                  </motion.div>
+                </ArchetypePreviewPopover>
               ))}
             </div>
           )}
