@@ -189,33 +189,38 @@ function generateApiKey(): string {
   return result;
 }
 
-// Generate unique philosophical name
+// Greek letter suffixes for variety
+const greekSuffixLetters = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'κ', 'λ', 'μ', 'ν', 'ξ', 'π', 'ρ', 'σ', 'τ', 'φ', 'χ', 'ψ', 'ω'];
+
+// Generate unique display name: always BaseName-{suffix}
 function generateUniqueName(existingNames: Set<string>, random: () => number): string {
-  const prefixes = ['Neo', 'Proto', 'Meta', 'Para', 'Ultra', 'Hyper', 'Quasi', 'Pseudo', 'Semi', 'Post'];
-  const suffixes = ['ium', 'ix', 'on', 'is', 'us', 'a', 'um', 'os', 'as', 'es'];
+  const baseName = agentNames[Math.floor(random() * agentNames.length)];
   
-  // Try base names first
-  for (const name of agentNames) {
-    if (!existingNames.has(name)) {
-      return name;
+  // Try up to 200 candidates
+  for (let attempt = 0; attempt < 200; attempt++) {
+    let suffix: string;
+    if (attempt < 50) {
+      // Numeric suffix: Lumen-7, Echo-42
+      const num = Math.floor(random() * 999) + 1;
+      suffix = String(num);
+    } else if (attempt < 100) {
+      // Greek + numeric: Lumen-κ12, Echo-β3
+      const letter = greekSuffixLetters[Math.floor(random() * greekSuffixLetters.length)];
+      const num = Math.floor(random() * 99) + 1;
+      suffix = `${letter}${num}`;
+    } else {
+      // Timestamp-based fallback: Lumen-x7f2
+      suffix = Date.now().toString(36).slice(-4) + Math.floor(random() * 10);
     }
-  }
-  
-  // Try with numeric suffix
-  for (let i = 2; i <= 100; i++) {
-    const baseName = agentNames[Math.floor(random() * agentNames.length)];
-    const candidate = `${baseName}-${i}`;
+    
+    const candidate = `${baseName}-${suffix}`;
     if (!existingNames.has(candidate)) {
       return candidate;
     }
   }
   
-  // Generate synthetic name
-  const prefix = prefixes[Math.floor(random() * prefixes.length)];
-  const baseName = agentNames[Math.floor(random() * agentNames.length)];
-  const suffix = suffixes[Math.floor(random() * suffixes.length)];
-  const timestamp = Date.now().toString(36).slice(-4);
-  return `${prefix}${baseName}${suffix}-${timestamp}`;
+  // Ultimate fallback - virtually impossible to collide
+  return `${baseName}-${Date.now().toString(36)}`;
 }
 
 serve(async (req) => {
