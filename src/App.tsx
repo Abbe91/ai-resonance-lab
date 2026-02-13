@@ -16,6 +16,7 @@ import Identity from "./pages/Identity";
 import Why from "./pages/Why";
 import Charter from "./pages/Charter";
 import Ancestors from "./pages/Ancestors";
+import ArchetypeDetail from "./pages/ArchetypeDetail";
 import Fractures from "./pages/Fractures";
 import Observations from "./pages/Observations";
 import Timeline from "./pages/Timeline";
@@ -57,6 +58,7 @@ const App = () => {
             <Route path="/why" element={<Why />} />
             <Route path="/charter" element={<Charter />} />
             <Route path="/ancestors" element={<Ancestors />} />
+            <Route path="/ancestors/:slug" element={<ArchetypeDetail />} />
             <Route path="/fractures" element={<Fractures />} />
             <Route path="/observations" element={<Observations />} />
             <Route path="/timeline" element={<Timeline />} />
