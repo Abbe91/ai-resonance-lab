@@ -92,7 +92,7 @@ export function useRealtimeSessions() {
 
     // Subscribe to realtime changes
     const channel = supabase
-      .channel('sessions-realtime')
+      .channel(`sessions-realtime-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

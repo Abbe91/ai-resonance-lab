@@ -111,7 +111,7 @@ export function useObserverMetrics(sessionId?: string) {
 
     // Subscribe to realtime changes
     const metricsChannel = supabase
-      .channel(`observer-metrics-${sessionId}`)
+      .channel(`observer-metrics-${sessionId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -127,7 +127,7 @@ export function useObserverMetrics(sessionId?: string) {
       .subscribe();
 
     const notesChannel = supabase
-      .channel(`observer-notes-${sessionId}`)
+      .channel(`observer-notes-${sessionId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -204,7 +204,7 @@ export function useClassificationDistribution() {
 
     // Subscribe to changes
     const channel = supabase
-      .channel('observer-distribution')
+      .channel(`observer-distribution-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
