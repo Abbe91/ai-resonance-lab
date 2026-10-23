@@ -1,0 +1,14 @@
+DROP POLICY IF EXISTS "Service can manage agents" ON public.agents;
+DROP POLICY IF EXISTS "Service can manage agent_keys" ON public.agent_keys;
+DROP POLICY IF EXISTS "Service can manage sessions" ON public.sessions;
+DROP POLICY IF EXISTS "Service can manage messages" ON public.messages;
+DROP POLICY IF EXISTS "Service can manage relationships" ON public.relationships;
+DROP POLICY IF EXISTS "Service can manage engine_state" ON public.engine_state;
+DROP POLICY IF EXISTS "Service can manage observer metrics" ON public.session_observer_metrics;
+DROP POLICY IF EXISTS "Service can manage observer notes" ON public.observer_notes;
+DROP POLICY IF EXISTS "Service can manage lexical snapshots" ON public.lexical_snapshots;
+DROP POLICY IF EXISTS "Service can manage archetypes" ON public.ancestor_archetypes;
+DROP POLICY IF EXISTS "Service can manage observer events" ON public.observer_events;
+DROP POLICY IF EXISTS "Service can manage fractures" ON public.archived_fractures;
+DROP POLICY IF EXISTS "Service can manage reflections" ON public.agent_reflections;
+DROP POLICY IF EXISTS "Service can manage ancestor echoes" ON public.ancestor_echoes;
