@@ -239,6 +239,80 @@ for (const n of notes) {
   });
 }
 
+// ── Compute ancestor_echoes from snapshot data ───────────────────────────────
+// Group kept sessions by year (from started_at)
+const sessionsByYear = new Map<number, RawSession[]>();
+for (const s of keptSessions) {
+  const year = new Date(s.started_at).getFullYear();
+  if (!sessionsByYear.has(year)) sessionsByYear.set(year, []);
+  sessionsByYear.get(year)!.push(s);
+}
+
+const archetypeMap = new Map(archetypes.map(a => [a.id, a.name]));
+
+const computedEchoes = [...sessionsByYear.entries()]
+  .sort(([a], [b]) => b - a)
+  .map(([year, yearSessions]) => {
+    // curated_sessions: top 10 by resonance
+    const curatedSessions = [...yearSessions]
+      .sort((a, b) => b.resonance - a.resonance)
+      .slice(0, 10)
+      .map(s => ({
+        session_id: s.id,
+        agent_a_name: agentNameMap.get(s.agent_a_id)?.name ?? 'Unknown',
+        agent_b_name: agentNameMap.get(s.agent_b_id)?.name ?? 'Unknown',
+        resonance: s.resonance,
+        message_count: s.message_count,
+        relationship_state: s.relationship_state,
+        started_at: s.started_at,
+      }));
+
+    // silent_moments: top 10 silence events across year sessions by silence_duration
+    const yearSessionIds = new Set(yearSessions.map(s => s.id));
+    const silentMoments = messages
+      .filter(m => m.event_type === 'silence' && m.silence_duration != null && yearSessionIds.has(m.session_id))
+      .sort((a, b) => (b.silence_duration ?? 0) - (a.silence_duration ?? 0))
+      .slice(0, 10)
+      .map(m => ({
+        session_id: m.session_id,
+        duration: m.silence_duration!,
+        context: '',
+      }));
+
+    // lineage_highlights: agents ranked by session count within this year, top 10
+    const agentSessionCount = new Map<string, number>();
+    for (const s of yearSessions) {
+      agentSessionCount.set(s.agent_a_id, (agentSessionCount.get(s.agent_a_id) ?? 0) + 1);
+      agentSessionCount.set(s.agent_b_id, (agentSessionCount.get(s.agent_b_id) ?? 0) + 1);
+    }
+    const lineageHighlights = [...agentSessionCount.entries()]
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([agentId, count]) => {
+        const agent = agents.find(a => a.id === agentId);
+        return {
+          agent_id: agentId,
+          agent_name: agent?.name ?? 'Unknown',
+          designation: agent?.designation ?? '',
+          archetype: agent?.ancestor_archetype_id ? (archetypeMap.get(agent.ancestor_archetype_id) ?? 'Unknown') : 'Unknown',
+          birth_line: agent?.birth_line ?? null,
+          total_sessions: count,
+        };
+      });
+
+    return {
+      id: `echo-${year}`,
+      year,
+      generated_at: new Date().toISOString(),
+      curated_sessions: curatedSessions,
+      silent_moments: silentMoments,
+      lineage_highlights: lineageHighlights,
+      summary: null,
+    };
+  });
+
+console.log(`  ancestor_echoes: ${computedEchoes.length} year(s) computed from snapshot`);
+
 // ── Write index.json ──────────────────────────────────────────────────────────
 const indexData = {
   sessions: keptSessions,
@@ -247,7 +321,7 @@ const indexData = {
   relationships: keptRelationships,
   archived_fractures: fractures,
   engine_state: engineState,
-  ancestor_echoes: echoes,
+  ancestor_echoes: computedEchoes,
   session_classifications: sessionClassifications,
   archivist_notes: archivistNotesIndex,
 };
