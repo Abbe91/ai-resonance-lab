@@ -114,7 +114,7 @@ export function useRealtimeAgents() {
 
     // Subscribe to realtime changes
     const channel = supabase
-      .channel('agents-realtime')
+      .channel(`agents-realtime-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -230,7 +230,7 @@ export function useRealtimeAgent(agentId: string | undefined) {
 
     // Subscribe to realtime changes for this specific agent
     const channel = supabase
-      .channel(`agent-${agentId}`)
+      .channel(`agent-${agentId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

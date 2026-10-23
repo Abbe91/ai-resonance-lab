@@ -68,7 +68,7 @@ export function useRealtimeMessages(sessionId: string | undefined) {
 
     // Subscribe to realtime message changes
     const channel = supabase
-      .channel(`messages-${sessionId}`)
+      .channel(`messages-${sessionId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

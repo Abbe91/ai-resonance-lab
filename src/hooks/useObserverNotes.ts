@@ -88,7 +88,7 @@ export function useObserverNotes(filter?: string) {
     fetchNotes();
 
     const channel = supabase
-      .channel('observer-notes-realtime')
+      .channel(`observer-notes-realtime-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

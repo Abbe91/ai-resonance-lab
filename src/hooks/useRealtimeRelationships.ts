@@ -61,7 +61,7 @@ export function useRealtimeRelationships() {
 
     // Subscribe to realtime changes
     const channel = supabase
-      .channel('relationships-realtime')
+      .channel(`relationships-realtime-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

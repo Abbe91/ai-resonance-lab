@@ -70,7 +70,7 @@ export function useArchivedFractures() {
 
     // Subscribe to realtime changes
     const channel = supabase
-      .channel('fractures-realtime')
+      .channel(`fractures-realtime-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

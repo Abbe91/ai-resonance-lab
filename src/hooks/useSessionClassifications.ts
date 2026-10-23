@@ -36,7 +36,7 @@ export function useSessionClassifications() {
 
     // Subscribe to changes
     const channel = supabase
-      .channel('session-classifications')
+      .channel(`session-classifications-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
