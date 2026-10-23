@@ -8,11 +8,9 @@ import { ObserverDisclaimer } from '@/components/observer/ObserverDisclaimer';
 import { useRealtimeSessions } from '@/hooks/useRealtimeSessions';
 import { useRealtimeAgents } from '@/hooks/useRealtimeAgents';
 import { useSessionClassifications } from '@/hooks/useSessionClassifications';
-import { useEngineRunner } from '@/hooks/useEngineRunner';
 
 const Index = () => {
-  // Initialize the autonomous engine
-  const { isRunning, tickCount } = useEngineRunner();
+
   
   // Real-time data from database
   const { activeSessions, otherSessions, loading: sessionsLoading } = useRealtimeSessions();
@@ -60,19 +58,13 @@ const Index = () => {
             {/* Engine Status */}
             <div className="mt-4 flex items-center justify-center gap-4 text-xs font-mono text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-resonance animate-pulse' : 'bg-dormant'}`} />
-                <span>Engine {isRunning ? 'running' : 'stopped'}</span>
+                <span className="w-2 h-2 rounded-full bg-dormant" />
+                <span>Engine paused</span>
               </div>
               <span>·</span>
               <span>{agents.length} entities</span>
               <span>·</span>
               <span>{activeSessions.length + otherSessions.length} sessions</span>
-              {tickCount > 0 && (
-                <>
-                  <span>·</span>
-                  <span>{tickCount} ticks</span>
-                </>
-              )}
             </div>
           </div>
 
