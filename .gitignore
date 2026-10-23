@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Env files
+.env
+.env.*
+
+# Snapshot raw export
+scripts/.snapshot-raw/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

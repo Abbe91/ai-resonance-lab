@@ -1,17 +1,3 @@
-import { supabase } from '@/integrations/supabase/client';
-
-// Get agent by ID from database (for timeline entity lookup)
-async function fetchAgentById(id: string) {
-  const { data } = await supabase
-    .from('agents')
-    .select('id, name, designation')
-    .eq('id', id)
-    .single();
-  return data;
-}
-
-// Local cache for agents
-const agentCache: Record<string, { name: string; designation: string } | null> = {};
 
 interface TimelineEvent {
   id: string;

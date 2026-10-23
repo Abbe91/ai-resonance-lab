@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useRealtimeAgents, useAgentsPerformanceMode } from '@/hooks/useRealtimeAgents';
 import { useRealtimeRelationships } from '@/hooks/useRealtimeRelationships';
-import { supabase } from '@/integrations/supabase/client';
+import { getArchetypes } from '@/data/repository';
 
 interface Node {
   id: string;
@@ -76,15 +76,9 @@ export function NetworkGraph() {
     return ids.size;
   }, [relationships]);
 
-  // Fetch archetypes
+  // Fetch archetypes from snapshot
   useEffect(() => {
-    const fetchArchetypes = async () => {
-      const { data } = await supabase
-        .from('ancestor_archetypes')
-        .select('id, name');
-      if (data) setArchetypes(data);
-    };
-    fetchArchetypes();
+    getArchetypes().then(data => setArchetypes(data.map(a => ({ id: a.id, name: a.name }))));
   }, []);
 
   // Initialize nodes and edges from ALL agents
