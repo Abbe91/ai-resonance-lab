@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { AgentsGrid } from '@/components/ancestors/AgentsGrid';
 import { useArchetypeAgentsPaginated, SortMode } from '@/hooks/useArchetypeAgents';
-import { supabase } from '@/integrations/supabase/client';
+import { getArchetypes } from '@/data/repository';
 
 interface Archetype {
   id: string;
@@ -24,15 +24,11 @@ export default function ArchetypeDetail() {
 
   useEffect(() => {
     if (!slug) return;
-    (async () => {
-      const { data, error } = await supabase
-        .from('ancestor_archetypes')
-        .select('id, name, slug, description')
-        .eq('slug', slug)
-        .single();
-      if (!error && data) setArchetype(data);
+    getArchetypes().then(data => {
+      const found = data.find(a => a.slug === slug) ?? null;
+      setArchetype(found ? { id: found.id, name: found.name, slug: found.slug, description: found.description } : null);
       setArchetypeLoading(false);
-    })();
+    });
   }, [slug]);
 
   const { agents, totalCount, loading } = useArchetypeAgentsPaginated(
@@ -69,14 +65,12 @@ export default function ArchetypeDetail() {
       <Header />
       <main className="pt-32 pb-24">
         <div className="container mx-auto px-6">
-          {/* Breadcrumb */}
           <div className="mb-8">
             <Link to="/ancestors" className="text-xs font-mono text-muted-foreground/60 hover:text-primary transition-colors">
               ← Ancestor Archetypes
             </Link>
           </div>
 
-          {/* Title */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -89,15 +83,12 @@ export default function ArchetypeDetail() {
             <h1 className="text-4xl md:text-5xl font-light text-foreground mt-2 tracking-tight">
               {archetype.name}
             </h1>
-            <p className="text-muted-foreground mt-3 max-w-xl">
-              {archetype.description}
-            </p>
+            <p className="text-muted-foreground mt-3 max-w-xl">{archetype.description}</p>
             <p className="text-xs font-mono text-muted-foreground/40 mt-2">
               {totalCount} entities classified
             </p>
           </motion.div>
 
-          {/* Agents grid */}
           <AgentsGrid
             agents={agents}
             totalCount={totalCount}
@@ -111,7 +102,6 @@ export default function ArchetypeDetail() {
             onSearchChange={setSearch}
           />
 
-          {/* Disclaimer */}
           <p className="text-[10px] text-muted-foreground/40 font-mono text-center mt-16 max-w-md mx-auto">
             Archetypes are observational labels only. They do not influence agent decision-making or session outcomes.
           </p>

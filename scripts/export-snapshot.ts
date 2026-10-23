@@ -208,6 +208,37 @@ const keptRelationships = relationships.filter(
 // Birth events only (no exact_duplicate_blocked noise)
 const birthEvents = events.filter(e => e.event_type === "agent_birth");
 
+// ── Build index extras ────────────────────────────────────────────────────────
+// Agent name map for joins
+const agentNameMap = new Map(agents.map(a => [a.id, { name: a.name, designation: a.designation }]));
+
+// session_classifications: session_id → classification from metrics (for homepage SessionCard badges)
+const sessionClassifications = metrics
+  .filter(m => keptSessionIds.has(m.session_id))
+  .map(m => ({ session_id: m.session_id, classification: m.classification }));
+
+// archivist_notes: archivist_summary notes for kept sessions, joined with session data
+type ArchivistNoteIndexEntry = {
+  id: string; session_id: string; content: string; created_at: string;
+  agent_a_name: string | null; agent_b_name: string | null; relationship_state: string;
+};
+const archivistNotesIndex: ArchivistNoteIndexEntry[] = [];
+for (const n of notes) {
+  if (n.observation_type !== "archivist_summary") continue;
+  if (!keptSessionIds.has(n.session_id)) continue;
+  const session = keptSessions.find(s => s.id === n.session_id);
+  if (!session) continue;
+  archivistNotesIndex.push({
+    id: n.id,
+    session_id: n.session_id,
+    content: n.content,
+    created_at: n.created_at,
+    agent_a_name: agentNameMap.get(session.agent_a_id)?.name ?? null,
+    agent_b_name: agentNameMap.get(session.agent_b_id)?.name ?? null,
+    relationship_state: session.relationship_state,
+  });
+}
+
 // ── Write index.json ──────────────────────────────────────────────────────────
 const indexData = {
   sessions: keptSessions,
@@ -217,12 +248,15 @@ const indexData = {
   archived_fractures: fractures,
   engine_state: engineState,
   ancestor_echoes: echoes,
+  session_classifications: sessionClassifications,
+  archivist_notes: archivistNotesIndex,
 };
 
 const indexBytes = writeJson(path.join(SNAP_DIR, "index.json"), indexData);
 console.log(`  index.json: ${Math.round(indexBytes / 1024)} KB`);
 console.log(`    sessions: ${keptSessions.length}, agents: ${keptAgents.length}, relationships: ${keptRelationships.length}`);
 console.log(`    archetypes: ${archetypes.length}, fractures: ${fractures.length}`);
+console.log(`    session_classifications: ${sessionClassifications.length}, archivist_notes: ${archivistNotesIndex.length}`);
 
 // ── Write per-session files ───────────────────────────────────────────────────
 // Build lookup maps

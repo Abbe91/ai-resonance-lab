@@ -2,7 +2,7 @@ import { Header } from '@/components/Header';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { getArchetypes, getAgents } from '@/data/repository';
 import { ArchetypePreviewPopover } from '@/components/ancestors/ArchetypePreviewPopover';
 
 interface Archetype {
@@ -18,46 +18,26 @@ export default function Ancestors() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchArchetypes() {
-      const { data: archetypeData, error: archetypeError } = await supabase
-        .from('ancestor_archetypes')
-        .select('*')
-        .order('name');
-
-      if (archetypeError) {
-        console.error('Error fetching archetypes:', archetypeError);
-        setLoading(false);
-        return;
-      }
-
-      const { data: agentData, error: agentError } = await supabase
-        .from('agents')
-        .select('ancestor_archetype_id');
-
-      if (agentError) {
-        console.error('Error fetching agents:', agentError);
-      }
-
+    Promise.all([getArchetypes(), getAgents()]).then(([archetypeData, agentData]) => {
       const counts: Record<string, number> = {};
-      (agentData || []).forEach(agent => {
-        if (agent.ancestor_archetype_id) {
-          counts[agent.ancestor_archetype_id] = (counts[agent.ancestor_archetype_id] || 0) + 1;
+      for (const a of agentData) {
+        if (a.ancestor_archetype_id) {
+          counts[a.ancestor_archetype_id] = (counts[a.ancestor_archetype_id] || 0) + 1;
         }
-      });
-
+      }
       setArchetypes(
-        (archetypeData || []).map(a => ({
-          id: a.id,
-          name: a.name,
-          slug: a.slug ?? a.name.toLowerCase(),
-          description: a.description,
-          agentCount: counts[a.id] || 0,
-        }))
+        [...archetypeData]
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(a => ({
+            id: a.id,
+            name: a.name,
+            slug: a.slug ?? a.name.toLowerCase(),
+            description: a.description,
+            agentCount: counts[a.id] || 0,
+          }))
       );
       setLoading(false);
-    }
-
-    fetchArchetypes();
+    });
   }, []);
 
   const archetypeIcons: Record<string, string> = {
@@ -71,10 +51,9 @@ export default function Ancestors() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="pt-32 pb-24">
         <div className="container mx-auto px-6">
-          {/* Title */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -88,12 +67,11 @@ export default function Ancestors() {
               Ancestor Archetypes
             </h1>
             <p className="text-muted-foreground mt-4 max-w-xl mx-auto">
-              Each agent inherits a foundational orientation at birth. 
+              Each agent inherits a foundational orientation at birth.
               These archetypes do not determine behavior — they provide context for observation.
             </p>
           </motion.div>
 
-          {/* Archetypes Grid */}
           {loading ? (
             <div className="flex items-center justify-center py-24">
               <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -123,11 +101,9 @@ export default function Ancestors() {
                           {archetype.agentCount} agents
                         </span>
                       </div>
-                      
                       <h3 className="text-xl font-medium text-foreground mb-3 group-hover:text-primary transition-colors">
                         {archetype.name}
                       </h3>
-                      
                       <p className="text-sm text-muted-foreground leading-relaxed">
                         {archetype.description}
                       </p>
@@ -138,7 +114,6 @@ export default function Ancestors() {
             </div>
           )}
 
-          {/* Disclaimer */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
